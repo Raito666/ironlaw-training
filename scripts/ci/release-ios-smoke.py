@@ -35,17 +35,14 @@ try:
     device = ctl('create', 'Ironlaw Release ' + uuid.uuid4().hex[:8], model, runtime, timeout=50).strip()
     uuid.UUID(device)
     simulator.wait_boot(device, phase='release-simulator', timeout=240, output=output)
-    ctl('status_bar', device, 'override', '--time', '9:41', '--dataNetwork', 'wifi',
-        '--wifiMode', 'active', '--wifiBars', '3', '--cellularMode', 'active',
-        '--cellularBars', '4', '--batteryState', 'unplugged', '--batteryLevel', '100', timeout=20)
-    ctl('install', device, str(app), timeout=90)
+    ctl('install', device, str(app), timeout=90, log='release-install.log')
     state['installed'] = True
-    first = simulator.launch_pid(ctl('launch', device, simulator.BUNDLE, timeout=45))
+    first = simulator.launch_pid(ctl('launch', device, simulator.BUNDLE, timeout=45, log='release-launch.log'))
     data = Path(ctl('get_app_container', device, simulator.BUNDLE, 'data', timeout=30).strip())
     before = await_storage(data)
     state['firstReady'] = True
     ctl('terminate', device, simulator.BUNDLE, timeout=30)
-    second = simulator.launch_pid(ctl('launch', device, simulator.BUNDLE, timeout=45))
+    second = simulator.launch_pid(ctl('launch', device, simulator.BUNDLE, timeout=45, log='release-reopen.log'))
     after = await_storage(data)
     if first == second or before['payloadSha256'] != after['payloadSha256']:
         raise ValueError('Unexpected launch PID or data change')
