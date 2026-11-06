@@ -1,0 +1,6 @@
+api/node_modules/
+api/pnpm-lock.yaml
+data/
+.env
+.env.*
+!.env.example

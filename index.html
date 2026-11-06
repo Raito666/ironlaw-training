@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#080A08" />
+    <script>
+      try {
+        if (localStorage.getItem('jianlibao-launch-theme') === 'light') {
+          document.documentElement.dataset.theme = 'light';
+          document.documentElement.dataset.launchTheme = 'light';
+          document.querySelector('meta[name="theme-color"]').content = '#F4F2EB';
+        }
+      } catch {
+        // Storage can be blocked. Keep the default launch colors in that case.
+      }
+    </script>
+    <style>
+      html { background: #080a08; color-scheme: dark; }
+      html[data-theme="light"] { background: #f4f2eb; color-scheme: light; }
+      body { margin: 0; }
+      #app-launch {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        display: grid;
+        place-items: center;
+        background: #080a08;
+        color: #b9b8ac;
+      }
+      [data-launch-theme="light"] #app-launch { background: #f4f2eb; color: #56574e; }
+      .launch-icon, .launch-icon svg { display: block; width: 64px; height: 64px; }
+      .launch-message {
+        position: absolute;
+        inset-inline: 16px;
+        top: calc(50% + 48px);
+        margin: 0;
+        font: 400 13px/1.75 system-ui, sans-serif;
+        text-align: center;
+      }
+      .launch-progress, .launch-retry { visibility: hidden; }
+      .launch-progress { animation: launch-status 0s 500ms forwards; }
+      .launch-retry {
+        display: inline-grid;
+        place-items: center;
+        min-height: 44px;
+        padding-inline: 12px;
+        margin-block-start: 8px;
+        border: 1px solid currentColor;
+        border-radius: 10px;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        animation: launch-status 0s 12s forwards;
+      }
+      @keyframes launch-status { to { visibility: visible; } }
+      #app-launch[data-dismissed] {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity 120ms cubic-bezier(0.2, 0.7, 0.3, 1), visibility 0s 120ms;
+      }
+      #app-launch[data-dismissed] .launch-message { visibility: hidden; }
+      #app-launch[data-dismissed] :is(.launch-progress, .launch-retry) { animation: none; }
+      @media (prefers-reduced-motion: reduce) {
+        #app-launch[data-dismissed] { transition: none; }
+      }
+    </style>
+    <noscript><style>.launch-progress, .launch-retry { display: none; }</style></noscript>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="铁律" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="description" content="铁律 IRONLAW：记录每一组，清楚看见自己的训练进步。个人力量训练档案、本地保存与数据备份。" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <title>铁律 IRONLAW · 每一组，都算数</title>
+  </head>
+  <body>
+    <div id="app-launch" role="region" aria-label="启动铁律">
+      <span class="launch-icon" aria-hidden="true"><!-- launch-icon --></span>
+      <div class="launch-message">
+        <div class="launch-progress" role="status">正在打开本机训练记录…</div>
+        <button class="launch-retry" type="button">重新加载</button>
+        <noscript>请启用 JavaScript 后重新打开铁律。</noscript>
+      </div>
+    </div>
+    <script>
+      document.querySelector('#app-launch .launch-retry')
+        .addEventListener('click', () => location.reload());
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,195 @@
+/* Local source media keeps its original colors and full frame in both application themes. */
+.opengym-media {
+  margin-block: var(--space-5);
+  min-width: 0;
+}
+.opengym-media-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.opengym-media-heading h3 {
+  font-size: var(--text-md);
+}
+.opengym-media-heading > span,
+.opengym-media-note,
+.opengym-media-credit,
+.opengym-still figcaption {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+.opengym-variant-control {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.opengym-variant-control label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+.opengym-variant-control select {
+  width: auto;
+  max-width: 100%;
+  min-height: 44px;
+}
+.opengym-still {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--illustration-bg);
+}
+.opengym-still > img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 400px;
+  object-fit: contain;
+  filter: none;
+}
+.opengym-still figcaption {
+  padding: var(--space-2) var(--space-3);
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+.opengym-video {
+  margin-block: var(--space-4);
+  min-width: 0;
+}
+.opengym-video > video {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 400px;
+  object-fit: contain;
+  background: var(--illustration-bg);
+  border-radius: var(--radius-md);
+  filter: none;
+}
+.opengym-video-load {
+  min-height: 48px;
+}
+.opengym-media-offline {
+  padding-block: var(--space-4);
+  border-block: 1px solid var(--line);
+}
+.opengym-media-offline .row {
+  gap: var(--space-2);
+}
+.opengym-media-note {
+  margin-top: var(--space-2);
+}
+.opengym-media-credit {
+  margin-top: var(--space-3);
+  max-width: 64em;
+}
+.opengym-media-credit a {
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.opengym-media-credit span {
+  display: block;
+}
+.opengym-media-status,
+.opengym-media-unavailable {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  align-content: center;
+  min-height: 180px;
+  padding: var(--space-4);
+}
+.opengym-media-unavailable {
+  color: var(--illustration-ink);
+}
+.opengym-media-unavailable .btn {
+  background: var(--panel);
+  color: var(--text);
+}
+.opengym-thumbnail {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  background: var(--illustration-bg);
+  color: var(--illustration-ink);
+}
+.movement-art .opengym-thumbnail img,
+.opengym-thumbnail > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 190px;
+  object-fit: contain;
+  filter: none;
+}
+.opengym-thumbnail-unavailable {
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+}
+.opengym-media button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-height: 44px;
+}
+.opengym-view-controls {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.opengym-view-controls .btn {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.opengym-view-controls [aria-pressed="true"],
+.opengym-playback-tools [aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+}
+.opengym-still[hidden],
+.opengym-video[hidden] {
+  display: none;
+}
+.opengym-playback-tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.opengym-playback-tools label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+.opengym-playback-tools .form-select {
+  width: 100%;
+  min-width: 0;
+  padding-block: 0;
+}
+.opengym-playback-tools button {
+  min-width: 0;
+}
+@media (max-width: 480px) {
+  .opengym-still > img,
+  .opengym-video > video {
+    max-height: 280px;
+  }
+  .opengym-variant-control {
+    align-items: stretch;
+  }
+  .opengym-variant-control select {
+    width: 100%;
+  }
+}

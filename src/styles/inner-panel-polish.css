@@ -1,0 +1,427 @@
+/* Operate: stable dialog geometry and quiet, bounded feedback. Personal data is untouched. */
+html {
+  scrollbar-gutter: stable;
+}
+html[data-modal-open="true"] {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+dialog.modal {
+  /* Content length changes inside the same top-anchored frame, never its center. */
+  margin-block: var(--space-6) auto;
+  border-radius: var(--radius-lg);
+}
+.modal-header {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-1);
+}
+.modal-header h2 {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-lg);
+  line-height: var(--leading-cjk-tight);
+  overflow-wrap: anywhere;
+}
+.modal-header .icon-button {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: start;
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+.modal-body {
+  padding: var(--space-5);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--control-border) transparent;
+  scroll-padding-block: var(--space-4);
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+}
+.modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+.modal-body::-webkit-scrollbar-thumb {
+  background: var(--control-border);
+  border: 1px solid var(--surface-1);
+  border-radius: var(--radius-full);
+}
+.modal-body > :first-child {
+  margin-top: 0;
+}
+.modal-body > :last-child {
+  margin-bottom: 0;
+}
+.modal-body .form-grid {
+  gap: var(--space-4);
+}
+.modal-body .field {
+  min-width: 0;
+  gap: var(--space-2);
+}
+.modal-body .field > small {
+  text-align: start;
+}
+.modal-body .form-input,
+.modal-body .form-select,
+.modal-body .form-textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.modal-body .form-textarea {
+  resize: vertical;
+  text-align: start;
+}
+.modal-body .notice,
+.modal-body .error-text,
+.modal-body .field-error {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  text-align: start;
+}
+.modal-body .notice {
+  border-color: var(--border-subtle);
+  background: var(--surface-2);
+}
+.modal-body .template-item {
+  padding-block: var(--space-5);
+  border-top: 1px solid var(--border-default);
+}
+.modal-body .template-item .section-heading {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.modal-body .template-item h3 {
+  flex: 1 1 180px;
+  font-size: var(--text-md);
+}
+.modal-body .template-item .row {
+  flex-wrap: wrap;
+}
+.modal-footer {
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-1);
+  border-color: var(--border-default);
+}
+.modal-footer > .btn {
+  flex: 1 1 160px;
+  min-width: 0;
+  white-space: normal;
+}
+.modal-footer .manual-completed {
+  flex: 1 1 100%;
+  text-align: center;
+  color: var(--text-secondary);
+}
+.modal .exercise-picker {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+.exercise-picker .picker-pagination {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.picker-pagination > span {
+  grid-column: 1 / -1;
+  min-height: 24px;
+  text-align: center;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.picker-pagination > .btn {
+  padding-inline: var(--space-2);
+  min-width: 0;
+  white-space: normal;
+}
+.modal .explanation-tabs {
+  position: sticky;
+  top: calc(0px - var(--space-5));
+  z-index: 2;
+  padding-block: var(--space-2);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border-default);
+}
+.explanation-panel {
+  min-width: 0;
+}
+/* Navigation keeps its layout visible; only the destination text fades in. */
+::view-transition-new(page-title),
+::view-transition-new(page-subtitle) {
+  animation: fade-in 140ms var(--ease-enter) backwards;
+}
+::view-transition-new(page-subtitle) {
+  animation-delay: 20ms;
+}
+:root[data-snapshot-motion="static"]::view-transition-new(page-title),
+:root[data-snapshot-motion="static"]::view-transition-new(page-subtitle) {
+  animation-name: none;
+}
+.explanation-panel .supplement-guidance,
+.explanation-panel .explanation-more,
+.exercise-difficulty-note {
+  margin-block: var(--space-4);
+  border-block: 1px solid var(--border-default);
+  padding-block: var(--space-1);
+}
+.modal summary,
+.install-guide summary,
+.opengym-pair summary {
+  min-height: 48px;
+  padding-block: var(--space-3);
+  cursor: pointer;
+  color: var(--text-primary);
+  text-underline-offset: var(--space-1);
+}
+.training-tools-context,
+.training-tools-section h3 {
+  text-align: center;
+}
+.training-tools-nav {
+  gap: var(--space-1);
+  margin: var(--space-4) 0;
+  padding: var(--space-1);
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+.training-tools-nav button {
+  min-height: 48px;
+  border-color: transparent;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.training-tools-section {
+  min-width: 0;
+}
+.training-tools-field > span,
+.training-tools-field input {
+  text-align: center;
+}
+.training-tools-result {
+  min-height: 88px;
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+.training-tools-table th,
+.training-tools-table td {
+  text-align: center;
+}
+.training-tools-warmups li {
+  align-items: center;
+  gap: var(--space-3);
+}
+.settings-grid > .card {
+  padding: var(--space-5);
+}
+.settings-grid > .card > h2,
+.settings-grid .cloud-heading h2,
+.settings-grid .opengym-heading h2 {
+  font-size: var(--text-lg);
+}
+.settings-grid .data-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.settings-grid .data-actions > .btn {
+  flex: 1 1 160px;
+  min-width: 0;
+  white-space: normal;
+}
+.settings-grid .setting-row {
+  gap: var(--space-4);
+  padding-block: var(--space-4);
+}
+.settings-grid .setting-row strong {
+  display: block;
+  font-size: var(--text-base);
+}
+.setting-row > input[type="checkbox"] {
+  flex-shrink: 0;
+}
+.cloud-status,
+.opengym-status {
+  min-height: 48px;
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  font-variant-numeric: tabular-nums;
+}
+.checkbox-label,
+.radio-row {
+  min-height: 48px;
+  align-items: center;
+  gap: var(--space-3);
+}
+.install-hint {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+.body-record-actions > button {
+  min-height: 44px;
+  min-width: 44px;
+}
+.body-record-values {
+  gap: var(--space-2) var(--space-4);
+}
+.modal[data-motion-state="visible"] {
+  animation: inner-panel-in 180ms var(--ease-enter) backwards;
+}
+.modal[data-motion-state="exiting"] {
+  animation: inner-panel-out 100ms var(--ease-exit) both;
+}
+@keyframes inner-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes inner-panel-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.modal .btn,
+.modal .icon-button,
+.training-tools-nav button,
+.install-platforms button,
+.explanation-tabs > button {
+  transition:
+    color 120ms var(--ease-standard),
+    background-color 120ms var(--ease-standard),
+    border-color 120ms var(--ease-standard),
+    opacity 100ms var(--ease-standard),
+    transform 100ms var(--ease-standard);
+}
+.modal .btn:active:not(:disabled),
+.modal .icon-button:active:not(:disabled),
+.training-tools-nav button:active:not(:disabled) {
+  transform: scale(0.985);
+}
+.modal .btn:disabled,
+.modal .icon-button:disabled {
+  transform: none;
+}
+.modal :focus-visible,
+.training-tools-nav button:focus-visible,
+.install-guide summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (max-width: 760px), (hover: none) and (pointer: coarse) {
+  .modal::backdrop {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .modal-body {
+    scrollbar-gutter: auto;
+  }
+}
+@media (max-width: 760px) {
+  dialog.modal {
+    margin-block: var(--space-3) auto;
+  }
+  .modal-header {
+    padding-inline: var(--space-3);
+  }
+  .modal-header h2 {
+    font-size: var(--text-md);
+  }
+  .modal-body {
+    padding: var(--space-4);
+  }
+  .modal .explanation-tabs {
+    top: calc(0px - var(--space-4));
+  }
+  .modal-footer {
+    padding: var(--space-3) var(--space-4);
+  }
+  .modal-footer > .btn {
+    flex-basis: 120px;
+  }
+  .settings-grid > .card {
+    padding: var(--space-4);
+  }
+  .settings-grid .data-actions > .btn {
+    flex-basis: 100%;
+  }
+  .body-records > li {
+    flex-wrap: wrap;
+  }
+  .body-record-copy {
+    flex-basis: 100%;
+  }
+  .body-record-actions {
+    width: 100%;
+    justify-content: flex-end;
+    gap: var(--space-2);
+  }
+}
+@media (max-width: 480px) {
+  .modal-body .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .modal .exercise-picker {
+    padding: var(--space-3);
+  }
+  .settings-grid .setting-row:has(.form-select),
+  .settings-grid .setting-row:has(.form-input) {
+    flex-wrap: wrap;
+  }
+  .settings-grid .setting-row .form-select,
+  .settings-grid .setting-row .form-input {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-new(page-title),
+  ::view-transition-new(page-subtitle) {
+    animation: none;
+  }
+  .modal[data-motion-state="visible"] {
+    animation: fade-in 100ms var(--ease-enter) backwards;
+  }
+  .modal[data-motion-state="exiting"] {
+    animation: fade-out 100ms var(--ease-exit) both;
+  }
+  .modal .btn,
+  .modal .icon-button,
+  .training-tools-nav button,
+  .explanation-tabs > button {
+    transition-property: color, background-color, border-color, opacity;
+  }
+  .modal .btn:active:not(:disabled),
+  .modal .icon-button:active:not(:disabled),
+  .training-tools-nav button:active:not(:disabled) {
+    transform: none;
+  }
+}

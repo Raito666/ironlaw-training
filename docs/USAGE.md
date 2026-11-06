@@ -1,0 +1,43 @@
+# 铁律使用说明
+
+从 [GitHub Release](https://github.com/Raito666/ironlaw-training/releases/tag/v0.4.0-20261106) 下载对应平台。网页、手机浏览器和原生 App 各自保存本机数据，换设备或换版本前建议先导出备份。
+
+## 1. 安装或打开
+
+- **Windows / Mac 网页版**。解压 Web/PWA ZIP，Windows 运行「启动铁律-Web.cmd」，Mac 或 Linux 在解压目录运行 `sh start-web.sh`。已安装 Python 3 时，也可运行 `python -m http.server 4173 --bind 127.0.0.1 --directory public`，在浏览器打开 `http://127.0.0.1:4173/`。
+- **iPhone / iPad 网页应用**。Safari 打开部署在 HTTPS 的铁律网页，点分享菜单里的「添加到主屏幕」，再从桌面图标打开。可在「我 → 应用与离线」查看准备状态。
+- **安卓手机**。下载 Android APK，用系统安装器打开，按系统提示允许当前下载来源安装。也可以用 Chrome 打开 HTTPS 站点，再选「安装应用」或「添加到主屏幕」。原生预览版要求 Android 7.0 或更高版本。
+- **Mac 上的 iOS 模拟器**。Apple 芯片 Mac 安装 Xcode 和 iOS 模拟器，解压 Simulator ZIP，将 `App.app` 拖到已启动的模拟器。命令行可用 `xcrun simctl install booted App.app`。
+- **iPhone 原生开发版**。Release 的 IPA 未签名，需要在自己的开发环境配置签名和设备授权。用 Xcode Personal Team 免费签名时需要定期重新部署。日常可直接用 PWA。 [Apple 官方说明](https://developer.apple.com/help/account/basics/about-your-developer-account/)
+
+## 2. 记一次训练
+
+1. 打开「今天」，点「开始今天的训练」并确认。也可以在「计划」里先建立自己的模板。
+2. 输入重量和次数，点勾完成一组。休息计时可延长或跳过，训练工具里可以查看配片和热身建议。
+3. 完成后进入回顾并点「保存训练」。已有草稿可以从「今天」继续。
+
+<img src="screenshots/training.png" width="295" alt="训练记录界面">
+
+## 3. 找动作和看讲解
+
+点「动作」，可用身体正背面、器械、技术难度和记录方式筛选。打开动作卡，切换「速查」或「详细讲解」，也可收藏动作。原有动作有三帧 SVG，部分动作有可离线保存的 wger 视频。扩展目录提供步骤、动作描述和署名。
+
+<img src="screenshots/exercise.png" width="295" alt="杠铃卧推讲解界面">
+
+## 4. 查历史、趋势和身体记录
+
+在「进步」中切换「训练历史」与「统计总览」。历史可打开某次训练查看各组，统计可选周期查看训练频次、容量、肌群分布和个人纪录。漏记时可在历史页选择补记。
+
+在「我 → 身体数据」记录体重、体脂和围度，可按指标与范围查看曲线，也可导出 CSV。
+
+| 历史 | 统计 | 身体 |
+| :---: | :---: | :---: |
+| <img src="screenshots/history.png" width="220" alt="训练日历和历史列表"> | <img src="screenshots/statistics.png" width="220" alt="训练趋势与统计摘要"> | <img src="screenshots/body.png" width="220" alt="身体趋势和近期记录"> |
+
+## 5. 备份和同步
+
+- 在「我」里选「导出备份」，保存 JSON。换浏览器或手机时，先在新环境选择文件，检查预览再确认导入。CSV 便于查看，恢复完整记录请使用 JSON。
+- 云同步需要主动连接同一个同步空间。同步密钥请私下保管，普通备份里没有密钥。原生版可以连接应用内置同步服务。自行部署的 Web 版需另外部署同步函数，本地静态 ZIP 可直接使用记录和备份。
+- 草稿及离线素材各自保存在设备里。卸载应用或清理浏览器存储前，请先导出备份。
+
+截图均为演示数据。安装包摘要随 Release 的 `SHA256SUMS.txt` 一起提供。

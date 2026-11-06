@@ -1,0 +1,243 @@
+/* Refinements preserve the supplied IRONLAW direction and original input/motion contracts. */
+:root[data-theme='light'] {
+  --text-tertiary: #68695e;
+}
+.form-input,
+.form-select,
+.form-textarea,
+.number-input,
+.set-type {
+  border-color: var(--control-border);
+}
+.segmented button,
+.template-actions .btn {
+  min-height: 44px;
+}
+.template-actions {
+  flex-wrap: wrap;
+}
+.btn,
+.icon-button,
+.segmented button,
+.form-input,
+.form-select,
+.form-textarea,
+.number-input,
+.set-type {
+  transition-duration: 120ms;
+}
+.atlas-figures figure[hidden] {
+  display: none;
+}
+.atlas-view-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.body-figure.feminine .body-outline {
+  fill: var(--surface-3);
+  stroke: var(--text-tertiary);
+  stroke-width: 1;
+}
+.body-figure.feminine .body-shape-line {
+  fill: none;
+  opacity: 0.5;
+}
+.exercise-picker {
+  min-width: 0;
+  width: 100%;
+}
+.exercise-picker .form-select {
+  width: 100%;
+  max-width: 100%;
+}
+.exercise-picker .picker-pagination {
+  gap: var(--space-2);
+}
+.search-row:has(.exercise-picker) {
+  flex-wrap: wrap;
+}
+.search-row > .exercise-picker {
+  flex: 1 1 100%;
+}
+.opengym-explanation {
+  max-width: 48rem;
+}
+.opengym-explanation p,
+.opengym-explanation li {
+  max-width: 34em;
+}
+.opengym-explanation ol {
+  padding-inline-start: var(--space-6);
+}
+.opengym-explanation li + li {
+  margin-top: var(--space-3);
+}
+.content-attribution {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  margin-top: var(--space-6);
+}
+.content-attribution a {
+  display: inline-block;
+  min-height: 44px;
+  padding-block: var(--space-3);
+}
+.load-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+.sidebar-nav .nav-item {
+  scroll-margin-block: var(--space-1);
+}
+@media (max-width: 760px) {
+  .main[data-page='today'] .today-hero {
+    min-height: 0;
+    padding: var(--space-5);
+  }
+  .today-kicker {
+    margin-bottom: var(--space-2);
+  }
+  .today-hero-meta {
+    display: none;
+  }
+  .today-hero-actions {
+    margin-top: var(--space-3);
+  }
+  .today-display-line {
+    display: inline;
+  }
+  .main[data-page='today'] .today-hero-link {
+    margin-top: 0;
+  }
+  .today-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .today-stats .stat {
+    padding: var(--space-3) var(--space-2);
+  }
+  .today-stats .stat:nth-child(3) {
+    grid-column: auto;
+    border-top: 0;
+    border-left: 1px solid var(--line);
+  }
+  .today-stat-index,
+  .today-stat-spark {
+    display: none;
+  }
+  .today-stats .stat-value {
+    font-size: var(--text-xl);
+  }
+  .today-stats .stat-value small {
+    font-size: var(--text-xs);
+  }
+  .library-intro {
+    gap: var(--space-3);
+  }
+  .library-page .library-intro {
+    margin-bottom: var(--space-3);
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+  .library-intro > div {
+    min-width: 0;
+    flex: 1;
+  }
+  .library-intro > button {
+    flex-shrink: 0;
+  }
+  .library-intro p {
+    font-size: var(--text-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .library-search {
+    min-height: 48px;
+  }
+  .main[data-page='exercises'] .topbar {
+    margin-bottom: var(--space-3);
+  }
+  .mobile-nav .nav-item:hover {
+    transform: none;
+  }
+  .library-page .body-filter {
+    margin-bottom: var(--space-2);
+  }
+  .library-intro-detail {
+    display: none;
+  }
+  .movement-info {
+    padding: var(--space-3);
+    min-height: 0;
+  }
+  .movement-info > p {
+    display: none;
+  }
+  .movement-info > span {
+    margin-top: var(--space-1);
+  }
+  .library-toolbar {
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+  .library-filter-line {
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+  .analytics-toolbar {
+    padding-top: 0;
+  }
+  .main[data-page='progress'] > .topbar {
+    margin-bottom: var(--space-3);
+  }
+  .progress-page .progress-masthead {
+    padding: var(--space-2) var(--space-4);
+    margin-bottom: var(--space-3);
+  }
+  .progress-tabbar {
+    padding-bottom: var(--space-3);
+  }
+  .statistics-page .period-caption {
+    margin-block: var(--space-2);
+  }
+  .statistics-page .analytics-overview {
+    margin-top: var(--space-2);
+  }
+  .analytics-overview > h2 {
+    margin-bottom: var(--space-4);
+  }
+  .statistics-page .analytics-overview .analytics-metrics {
+    padding-block: var(--space-2);
+    gap: var(--space-4) 0;
+  }
+  .analytics-overview .analytics-metric:nth-child(2) {
+    padding-bottom: var(--space-4);
+  }
+}
+@media (max-width: 359px) {
+  .workout-view .exercise-heading {
+    margin-bottom: var(--space-2);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .btn,
+  .app-shell .card,
+  .app-shell .movement-card,
+  .app-shell .today-hero,
+  .app-shell .today-dial,
+  .app-shell .template-card,
+  .app-shell .movement-open,
+  .app-shell .rail-nav button,
+  .app-shell .segmented button {
+    transform: none;
+    transition:
+      color 120ms,
+      background-color 120ms,
+      border-color 120ms,
+      opacity 120ms;
+  }
+}

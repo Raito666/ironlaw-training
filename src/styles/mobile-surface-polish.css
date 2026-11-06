@@ -1,0 +1,387 @@
+/* Operate UI: centered controls and measured surfaces; reading text stays readable. */
+.btn,
+.segmented button,
+.explanation-tabs > button,
+.complete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  text-align: center;
+  line-height: var(--leading-cjk-tight);
+}
+.btn {
+  border-radius: var(--radius-md);
+  padding-block: var(--space-3);
+}
+.btn > svg,
+.text-button > svg {
+  flex-shrink: 0;
+}
+button.text-button,
+a.text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+.today-stats .stat {
+  text-align: center;
+}
+.today-stats .stat-value {
+  justify-content: center;
+}
+.today-stat-index,
+.atlas-kicker {
+  display: none;
+}
+.segmented {
+  padding: var(--space-1);
+  gap: var(--space-1);
+  border-radius: var(--radius-md);
+  background-image: none;
+}
+.segmented button {
+  min-width: 0;
+  border-radius: var(--radius-sm);
+  padding-inline: var(--space-3);
+}
+.card,
+.template-card,
+.movement-card,
+.body-atlas,
+.analytics-metrics,
+.summary-card {
+  background-image: none;
+  box-shadow: none;
+  border-color: var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+.movement-card:hover {
+  transform: none;
+  box-shadow: none;
+}
+.form-input,
+.form-textarea {
+  background-image: none;
+  border-radius: var(--radius-md);
+}
+.form-select,
+.library-source-filter select,
+.body-controls select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 48px;
+  padding: 0 var(--space-8);
+  border: 1px solid var(--control-line);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  background-color: var(--surface-2);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-secondary) 50%),
+    linear-gradient(135deg, var(--text-secondary) 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) 50%,
+    calc(100% - 16px) 50%;
+  background-size:
+    4px 4px,
+    4px 4px;
+  background-repeat: no-repeat;
+  text-align: center;
+  text-align-last: center;
+  font-size: var(--text-base);
+  line-height: normal;
+}
+.form-select option,
+.library-source-filter option,
+.body-controls option {
+  color: var(--text);
+  background: var(--panel);
+}
+.setting-row .form-select,
+.history-toolbar .form-select,
+.analytics-trend .form-select,
+.rpe-select {
+  padding-inline: var(--space-4);
+  background-position:
+    calc(100% - 12px) 50%,
+    calc(100% - 8px) 50%;
+}
+.field > label,
+.field > span,
+.library-field-label,
+.library-filter-field > span {
+  text-align: center;
+}
+input[inputmode="decimal"],
+input[inputmode="numeric"],
+input[type="number"],
+.set-type {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.form-textarea {
+  text-align: left;
+}
+.stat,
+.analytics-metric,
+.body-latest > div {
+  text-align: center;
+}
+.stat-value,
+.body-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--space-1);
+}
+.stat-label {
+  text-align: center;
+}
+.template-card h2,
+.template-card h3 {
+  text-align: center;
+}
+.template-actions,
+.modal-footer .row {
+  justify-content: center;
+  gap: var(--space-2);
+}
+.detail-meta {
+  justify-content: center;
+  text-align: center;
+}
+.exercise-english {
+  text-align: center;
+}
+.explanation-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.explanation-tabs > button {
+  padding-inline: var(--space-2);
+  min-width: 0;
+}
+.library-page .library-filter-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+.library-source-filter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  inline-size: 100%;
+}
+.library-field-label {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.library-page .library-filter-line > p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+.library-page .library-filter-line .text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin: 0;
+}
+.library-page .library-filter-line > .row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: var(--space-3);
+  width: 100%;
+}
+.library-filter-field {
+  gap: var(--space-2);
+}
+.library-page .library-filter-line .library-filter-field .form-select {
+  padding-inline: var(--space-8);
+}
+.library-search {
+  border-radius: var(--radius-md);
+  background-image: none;
+  box-shadow: none;
+}
+.library-active-filters {
+  justify-content: center;
+}
+.library-active-filters button {
+  justify-content: center;
+}
+.library-browse-bar {
+  border-radius: var(--radius-md);
+  padding-inline: var(--space-3);
+}
+.library-difficulty-guide,
+.exercise-difficulty-note {
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.library-difficulty-guide > summary,
+.exercise-difficulty-note > summary {
+  text-align: center;
+  list-style-position: inside;
+}
+.library-difficulty-help {
+  margin-inline: auto;
+  text-align: center;
+}
+.movement-card .movement-open {
+  text-align: center;
+}
+.movement-info {
+  padding: var(--space-4) var(--space-3);
+  text-align: center;
+}
+.movement-info h3 {
+  padding-right: 0;
+  text-align: center;
+}
+.movement-info > span {
+  justify-content: center;
+}
+.movement-level-label {
+  text-align: center;
+}
+.movement-card .favorite-button {
+  position: static;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: calc(100% - 24px);
+  min-height: 44px;
+  margin: 0 var(--space-3) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+}
+.movement-card .favorite-button[aria-pressed="true"] {
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+.movement-quick > summary {
+  text-align: center;
+  list-style-position: inside;
+}
+.opengym-media-heading {
+  justify-content: center;
+  text-align: center;
+}
+.opengym-media-heading > span {
+  flex-basis: 100%;
+}
+.opengym-still,
+.opengym-video > video {
+  border-radius: var(--radius-lg);
+}
+.opengym-still figcaption {
+  text-align: center;
+}
+.opengym-playback-tools label {
+  text-align: center;
+}
+.opengym-playback-tools .form-select {
+  padding-inline: var(--space-6);
+}
+.opengym-media-offline .row {
+  justify-content: center;
+}
+.opengym-media-offline .btn {
+  flex: 1 1 100%;
+}
+.opengym-media-offline .opengym-media-note {
+  text-align: center;
+}
+@media (max-width: 1000px) {
+  .library-page .library-filter-line > .row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .library-difficulty-field {
+    grid-column: 1 / -1;
+  }
+  .library-page .library-filter-line .library-filter-field .form-select {
+    padding-inline: var(--space-4);
+    background-position:
+      calc(100% - 12px) 50%,
+      calc(100% - 8px) 50%;
+  }
+  .library-page .library-filter-line .library-difficulty-field .form-select {
+    padding-inline: var(--space-8);
+    background-position:
+      calc(100% - 20px) 50%,
+      calc(100% - 16px) 50%;
+  }
+}
+@media (max-width: 760px) {
+  .library-page .body-filter-toggle {
+    justify-content: center;
+    text-align: center;
+  }
+  .atlas-heading {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+  .atlas-heading-copy {
+    text-align: center;
+  }
+  .atlas-heading-copy p {
+    margin-inline: auto;
+  }
+  .atlas-heading .segmented {
+    width: 100%;
+    max-width: 320px;
+    margin-inline: auto;
+  }
+  .atlas-heading .segmented button {
+    flex: 1;
+  }
+  .atlas-kicker {
+    justify-content: center;
+  }
+  .body-value strong {
+    font-size: var(--text-xl);
+  }
+  .explanation-tabs > button {
+    font-size: var(--text-sm);
+  }
+  .load-more {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+  .load-more > span {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    text-align: center;
+  }
+  .load-more > .btn {
+    width: 100%;
+    min-width: 0;
+  }
+  .opengym-view-controls .btn,
+  .opengym-playback-tools .btn {
+    padding-inline: var(--space-2);
+  }
+}

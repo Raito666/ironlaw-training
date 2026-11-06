@@ -1,0 +1,97 @@
+.opengym-connection {
+  min-width: 0;
+}
+.opengym-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.opengym-heading h2 {
+  margin: 0;
+}
+.opengym-body,
+.opengym-form,
+.opengym-conflicts {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.opengym-body p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.opengym-body .data-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.opengym-body .btn,
+.opengym-connection select,
+.opengym-connection input {
+  min-height: 44px;
+  max-width: 100%;
+}
+.opengym-body .btn {
+  white-space: normal;
+}
+.opengym-connection .field {
+  min-width: 0;
+}
+.opengym-connection input:not([type='checkbox']),
+.opengym-connection select {
+  width: 100%;
+  min-width: 0;
+}
+.opengym-account {
+  display: grid;
+  gap: var(--space-1);
+}
+.opengym-status {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+.opengym-pair {
+  border-top: 1px solid var(--control-border);
+  padding-top: var(--space-2);
+}
+.opengym-pair summary,
+.opengym-versions summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.opengym-pair[open] > :not(summary) {
+  margin-top: var(--space-3);
+}
+.opengym-code {
+  display: block;
+  width: fit-content;
+  padding: var(--space-3);
+  background: var(--surface-2);
+  font-family: var(--font-num);
+  font-size: var(--text-lg);
+  letter-spacing: 0.1em;
+  overflow-wrap: anywhere;
+}
+.opengym-conflict {
+  min-width: 0;
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+.opengym-versions {
+  display: grid;
+  gap: var(--space-2);
+}
+.opengym-versions pre {
+  font-family: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 240px;
+  overflow: auto;
+  font-size: var(--text-sm);
+}
