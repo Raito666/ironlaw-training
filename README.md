@@ -2,6 +2,8 @@
 
 免费的个人训练记录应用。记录每组重量、次数、时长和 RPE，回看训练容量、动作纪录和身体趋势。内置动作筛选、中文讲解与休息计时，可离线记录和导出备份。
 
+**[立即打开网页版](https://jianlibao-training-raitox.netlify.app/mobile/)** · 手机和电脑均可直接访问。
+
 [下载各平台版本](https://github.com/Raito666/ironlaw-training/releases/tag/v0.4.0-20261106) · [图文使用说明](docs/USAGE.md) · [开发与自托管](docs/DEVELOPMENT.md)
 
 ![铁律桌面版的训练主页，使用演示数据](docs/screenshots/desktop.png)
