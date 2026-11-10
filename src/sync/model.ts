@@ -1,8 +1,10 @@
 import type { AppData } from '../domain/types';
 import { validateAppData, validateSharedCollections } from '../data/backup';
+import { validateTrainingSchedule } from '../data/backup';
+import { withTrainingSchedule } from '../data/migrations';
 
-const collections = ['exercises', 'templates', 'sessions', 'bodyMetrics'] as const;
-export type Snapshot = Pick<AppData, typeof collections[number]> & { version: 1; tombstones: string[] };
+const collections = ['exercises', 'templates', 'sessions', 'bodyMetrics', 'trainingSchedule'] as const;
+export type Snapshot = Pick<AppData, typeof collections[number]> & { version: 1 | 2; tombstones: string[] };
 export type Resolution = Record<string, 'local' | 'remote'>;
 export interface SyncConflict { key: string; name: string; local: unknown; remote: unknown }
 export function canonical(value: unknown): string {
@@ -13,20 +15,22 @@ export function canonical(value: unknown): string {
 export function emptySnapshot(): Snapshot { return { version: 1, exercises: [], templates: [], sessions: [], bodyMetrics: [], tombstones: [] }; }
 export function validateSnapshot(value: unknown): Snapshot {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('云同步数据格式无效');
-  const { version, tombstones = [], ...rest } = value as Record<string, unknown>;
-  if (version !== 1) throw new Error('不支持的云同步数据版本，请更新应用');
-  if (!Array.isArray(tombstones) || tombstones.length > 100000 || tombstones.some(k => typeof k !== 'string' || !/^(?:(?:exercises|templates|sessions):[A-Za-z0-9][A-Za-z0-9._:-]{0,119}|bodyMetrics:\d{4}-\d{2}-\d{2})$/.test(k)) || new Set(tombstones).size !== tombstones.length) throw new Error('云端删除标记无效');
-  const parsed = validateSharedCollections(rest);
+  const { version, tombstones = [], trainingSchedule, ...rest } = value as Record<string, unknown>;
+  if (version !== 1 && version !== 2) throw new Error('不支持的云同步数据版本，请更新应用');
+  if (version === 1 && (Object.hasOwn(value, 'trainingSchedule') || (Array.isArray(tombstones) && tombstones.some((key) => typeof key === 'string' && key.startsWith('trainingSchedule:'))))) throw new Error('云端排期版本无效');
+  if (!Array.isArray(tombstones) || tombstones.length > 100000 || tombstones.some(k => typeof k !== 'string' || !/^(?:(?:exercises|templates|sessions|trainingSchedule):[A-Za-z0-9][A-Za-z0-9._:-]{0,119}|bodyMetrics:\d{4}-\d{2}-\d{2})$/.test(k)) || new Set(tombstones).size !== tombstones.length) throw new Error('云端删除标记无效');
+  const parsed: Snapshot = { version, ...validateSharedCollections(rest), tombstones: [...tombstones].sort() };
+  if (version === 2) parsed.trainingSchedule = trainingSchedule === undefined ? [] : validateTrainingSchedule(trainingSchedule);
   const erased = new Set(tombstones);
-  if (collections.some(c => parsed[c].some(item => erased.has(`${c}:${keyOf(c, item)}`)))) throw new Error('云端记录同时标记为保留和删除，请核对同步文档');
-  return { version: 1, ...parsed, tombstones: [...tombstones].sort() };
+  if (collections.some(c => parsed[c]?.some(item => erased.has(`${c}:${keyOf(c, item)}`)))) throw new Error('云端记录同时标记为保留和删除，请核对同步文档');
+  return parsed;
 }
 export function snapshotOf(data: AppData): Snapshot {
-  return { version: 1, tombstones: [], exercises: data.exercises, templates: data.templates, bodyMetrics: data.bodyMetrics,
+  return { version: data.trainingSchedule ? 2 : 1, ...(data.trainingSchedule ? { trainingSchedule: data.trainingSchedule } : {}), tombstones: [], exercises: data.exercises, templates: data.templates, bodyMetrics: data.bodyMetrics,
     sessions: data.sessions.filter(s => s.status === 'completed' || s.status === 'cancelled') };
 }
 export function sameSnapshot(a: Snapshot, b: Snapshot): boolean {
-  return collections.every(c => canonical([...a[c]].sort((x, y) => keyOf(c, x).localeCompare(keyOf(c, y)))) === canonical([...b[c]].sort((x, y) => keyOf(c, x).localeCompare(keyOf(c, y)))));
+  return collections.every(c => canonical([...(a[c] ?? [])].sort((x, y) => keyOf(c, x).localeCompare(keyOf(c, y)))) === canonical([...(b[c] ?? [])].sort((x, y) => keyOf(c, x).localeCompare(keyOf(c, y)))));
 }
 export function sameDocument(a: Snapshot, b: Snapshot): boolean {
   return sameSnapshot(a, b) && canonical([...a.tombstones].sort()) === canonical([...b.tombstones].sort());
@@ -36,11 +40,15 @@ function keyOf(collection: typeof collections[number], item: { id: string; date?
 }
 export function mergeSnapshots(base: Snapshot, local: Snapshot, remote: Snapshot, resolutions: Resolution = {}) {
   const snapshot = emptySnapshot(), conflicts: SyncConflict[] = [];
+  if ([base, local, remote].some((document) => document.version === 2)) {
+    snapshot.version = 2;
+    snapshot.trainingSchedule = [];
+  }
   const deleted = Symbol('deleted');
   const equal = (a: unknown, b: unknown) => a === deleted || b === deleted ? a === b : canonical(a) === canonical(b);
   const tombstones = [base, local, remote].map(s => new Set(s.tombstones));
   for (const collection of collections) {
-    const maps = [base, local, remote].map(s => new Map(s[collection].map(v => [keyOf(collection, v), v])));
+    const maps = [base, local, remote].map(s => new Map((s[collection] ?? []).map(v => [keyOf(collection, v), v])));
     const [before, left, right] = maps;
     const erasedKeys = [...new Set(tombstones.flatMap(set => [...set]))].filter(k => k.startsWith(`${collection}:`)).map(k => k.slice(collection.length + 1));
     for (const id of [...new Set([...maps.flatMap(m => [...m.keys()]), ...erasedKeys])].sort()) {
@@ -54,18 +62,21 @@ export function mergeSnapshots(base: Snapshot, local: Snapshot, remote: Snapshot
       else if (resolutions[key]) chosen = resolutions[key] === 'local' ? l : r;
       else {
         const item = typeof l === 'object' ? l : typeof r === 'object' ? r : undefined;
-        conflicts.push({ key, name: collection === 'bodyMetrics' ? `${id} 身体记录` : item && 'name' in item ? item.name : id, local: l === deleted ? null : l ?? null, remote: r === deleted ? null : r ?? null });
+        const name = collection === 'trainingSchedule' && item && 'time' in item ? `${item.date} ${item.time} 训练排期` :
+          collection === 'bodyMetrics' ? `${id} 身体记录` : item && 'name' in item ? item.name : id;
+        conflicts.push({ key, name, local: l === deleted ? null : l ?? null, remote: r === deleted ? null : r ?? null });
         chosen = l;
       }
       // Each collection stays homogeneous; validators below check all foreign references.
       if (chosen === deleted) snapshot.tombstones.push(key);
-      else if (chosen) (snapshot[collection] as Array<typeof chosen>).push(chosen);
+      else if (chosen) (snapshot[collection]! as Array<typeof chosen>).push(chosen);
     }
   }
   return { snapshot, conflicts };
 }
 export function applySnapshot(local: AppData, snapshot: Snapshot): AppData {
-  const { version: _version, tombstones: _tombstones, ...shared } = validateSnapshot(snapshot), drafts = local.sessions.filter(s => !['completed', 'cancelled'].includes(s.status));
+  const { version, tombstones: _tombstones, trainingSchedule, ...shared } = validateSnapshot(snapshot), drafts = local.sessions.filter(s => !['completed', 'cancelled'].includes(s.status));
   if (drafts.some(d => shared.sessions.some(s => s.id === d.id))) throw new Error('云端已有同一场训练的归档记录。请先处理本机进行中的训练，再同步。');
-  return validateAppData({ ...local, ...shared, sessions: [...shared.sessions, ...drafts] });
+  const merged = { ...local, ...shared, sessions: [...shared.sessions, ...drafts] };
+  return validateAppData(version === 2 || local.schemaVersion === 3 ? withTrainingSchedule(merged, trainingSchedule ?? []) : merged);
 }

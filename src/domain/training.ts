@@ -1,4 +1,4 @@
-import { isWorkSet } from './sets';
+import { isWarmupTemplateItem, isWorkSet } from './sets';
 import type { Exercise, Session, SessionExercise, SessionStats, WorkoutTemplate } from './types';
 
 export function uid(): string {
@@ -31,7 +31,9 @@ export function createSession(template: WorkoutTemplate | null, exercises: Exerc
     exercises: template?.items.map((item) => {
       const exercise = exercises.find((candidate) => candidate.id === item.exerciseId);
       if (!exercise) throw new Error('模板中的动作不存在，请先修正模板');
-      return createSessionExercise(exercise, item.sets, item.weightKg, item.reps, item.durationSeconds);
+      const result = createSessionExercise(exercise, item.sets, item.weightKg, item.reps, item.durationSeconds);
+      if (isWarmupTemplateItem(item)) result.sets.forEach((set) => { set.type = 'warmup'; });
+      return result;
     }) ?? [],
   };
 }

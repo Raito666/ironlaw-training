@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AppData, Exercise, WorkoutTemplate } from "../domain/types";
 import { uid } from "../domain/training";
+import { isWarmupTemplateItem } from "../domain/sets";
 import Modal from "../components/Modal";
 import Icon from "../components/Icon";
 import { muscleGroups } from "../content/body-map";
@@ -144,7 +145,7 @@ export function TemplateEditor({
               <section className="card template-item" key={item.id}>
                 <div className="section-heading">
                   <h3 className="line-clamp-2 wrap-cjk">
-                    {index + 1}. {exercise?.name}
+                    {index + 1}. {exercise?.name}{isWarmupTemplateItem(item) ? ' · 热身' : ''}
                   </h3>
                   <div className="row">
                     <button

@@ -1,4 +1,4 @@
-// Loaded on demand by the native apps. Plugin proxies must stay inside this module.
+// Native-only. Keeping plugin proxies inside this module avoids async thenable assimilation.
 import { registerPlugin } from '@capacitor/core';
 import type { HapticsPlugin } from '@capacitor/haptics';
 import type { LocalNotificationsPlugin } from '@capacitor/local-notifications';

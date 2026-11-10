@@ -76,18 +76,27 @@ export interface BodyMetric {
   measurements?: Partial<Record<MeasurementKey, number>>;
   note?: string;
 }
+export type TrainingDate = {
+  id: string;
+  templateId: string;
+  date: string;
+  time: string;
+  lead: number;
+  choices: Record<string, string>;
+};
 export interface AppData {
-  schemaVersion: 2;
+  schemaVersion: 2 | 3;
   revision: number;
   exercises: Exercise[];
   templates: WorkoutTemplate[];
   sessions: Session[];
   bodyMetrics: BodyMetric[];
+  trainingSchedule?: TrainingDate[];
   settings: AppSettings;
   onboarded: boolean;
 }
 /** Strictly validated v1 input only; persistence writes the current AppData. */
-export type LegacyAppData = Omit<AppData, 'schemaVersion' | 'bodyMetrics' | 'settings'> & {
+export type LegacyAppData = Omit<AppData, 'schemaVersion' | 'bodyMetrics' | 'trainingSchedule' | 'settings'> & {
   schemaVersion: 1;
   settings: Omit<AppSettings, 'showRpe'>;
 };

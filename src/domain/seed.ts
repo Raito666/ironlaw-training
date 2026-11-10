@@ -1,6 +1,24 @@
 import type { AppData, Exercise, WorkoutTemplate } from './types';
 import { expandCatalog } from '../content/catalog';
 
+const starterDefinitions = [
+  { id: 'template-full', name: '全身基础', description: '原创基础模板 · 三类记录均可体验；组数、负重由你调整。', ids: ['ex-squat', 'ex-bench', 'ex-row', 'ex-plank'] },
+  { id: 'template-upper', name: '上肢训练', description: '原创基础模板 · 推、拉与手臂，按实际能力填写重量。', ids: ['ex-bench', 'ex-lat', 'ex-press', 'ex-curl'] },
+  { id: 'template-lower', name: '下肢与核心', description: '原创基础模板 · 下肢动作搭配核心训练。', ids: ['ex-squat', 'ex-rdl', 'ex-lunge', 'ex-crunch'] },
+];
+const starterUpdatedAt = '2026-10-15T00:00:00.000Z';
+
+/** Retire only untouched defaults at selection boundaries, including when an old backup is loaded. */
+export function isRetiredStarterTemplate(template: WorkoutTemplate): boolean {
+  const original = starterDefinitions.find(({ id }) => id === template.id);
+  return !!original && !template.archived && template.updatedAt === starterUpdatedAt &&
+    template.name === original.name && template.description === original.description &&
+    template.restSeconds === 90 && template.items.length === original.ids.length &&
+    template.items.every((item, index) => item.id === `${template.id}-item-${index + 1}` &&
+      item.exerciseId === original.ids[index] && item.sets === 3 && item.weightKg === 0 &&
+      item.reps === 10 && item.durationSeconds === 30);
+}
+
 export function createInitialData(): AppData {
   const exercises: Exercise[] = [
     { id: 'ex-squat', name: '杠铃深蹲', muscle: '腿部', equipment: '杠铃', kind: 'weight-reps', description: '记录杠铃和杠铃片的总重量。以自己能控制的幅度完成，动作不适时停止。' },
@@ -16,13 +34,8 @@ export function createInitialData(): AppData {
     { id: 'ex-plank', name: '平板支撑', muscle: '核心', equipment: '自重', kind: 'duration', description: '记录持续秒数，保持可控制的姿势与正常呼吸；不将秒数计入重量容量。' },
     { id: 'ex-crunch', name: '卷腹', muscle: '核心', equipment: '自重', kind: 'reps', description: '只记录完成次数，以可控制的幅度进行；不将体重计入重量容量。' },
   ];
-  const definitions = [
-    { id: 'template-full', name: '全身基础', description: '原创基础模板 · 三类记录均可体验；组数、负重由你调整。', ids: ['ex-squat', 'ex-bench', 'ex-row', 'ex-plank'] },
-    { id: 'template-upper', name: '上肢训练', description: '原创基础模板 · 推、拉与手臂，按实际能力填写重量。', ids: ['ex-bench', 'ex-lat', 'ex-press', 'ex-curl'] },
-    { id: 'template-lower', name: '下肢与核心', description: '原创基础模板 · 下肢动作搭配核心训练。', ids: ['ex-squat', 'ex-rdl', 'ex-lunge', 'ex-crunch'] },
-  ];
-  const templates: WorkoutTemplate[] = definitions.map(({ id, name, description, ids }) => ({
-    id, name, description, restSeconds: 90, updatedAt: '2026-10-15T00:00:00.000Z',
+  const templates: WorkoutTemplate[] = starterDefinitions.map(({ id, name, description, ids }) => ({
+    id, name, description, restSeconds: 90, updatedAt: starterUpdatedAt,
     items: ids.map((exerciseId, index) => ({ id: `${id}-item-${index + 1}`, exerciseId, sets: 3, weightKg: 0, reps: 10, durationSeconds: 30 })),
   }));
   return expandCatalog({ schemaVersion: 2, revision: 0, exercises, templates, sessions: [], bodyMetrics: [], settings: { unit: 'kg', theme: 'dark', defaultRest: 90, autoRest: true, showRpe: false, lastExportAt: null }, onboarded: false });

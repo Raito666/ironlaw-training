@@ -6,6 +6,7 @@ import { SqliteRepository } from '../../src/data/sqlite-repository';
 import { migrateSqliteSchema } from '../../src/data/sqlite-migration';
 import { TestSqliteDatabase } from '../helpers/sqlite-database';
 import { StoreConflictError } from '../../src/data/repository';
+import { withTrainingSchedule } from '../../src/data/migrations';
 const legacy = () =>
   JSON.parse(readFileSync(new URL('../fixtures/legacy-v1-ui-backup.json', import.meta.url), 'utf8')).data;
 const opened: IndexedDbRepository[] = [];
@@ -57,6 +58,19 @@ afterEach(async () => {
   await Promise.all(opened.splice(0).map((r) => r.close()));
 });
 describe('persisted payload migration', () => {
+  it('commits the first v3 schedule with a v2 rollback copy and preserves the v1 copy', async () => {
+    const old = legacy();
+    await seedIdb(old);
+    const repo = repository();
+    const v2 = await repo.load();
+    const entry = { id: 'schedule-migration', templateId: 'preset-full-full', date: '2030-02-04', time: '19:00', lead: 15, choices: {} };
+    const upgraded = await repo.save(withTrainingSchedule(v2, [entry]), v2.revision);
+    expect(upgraded).toMatchObject({ schemaVersion: 3, trainingSchedule: [entry], sessions: v2.sessions });
+    expect(await rawRead('pre-schema-v3')).toEqual(v2);
+    expect(await rawRead('pre-schema-v2')).toEqual(old);
+    expect(await repo.load()).toEqual(upgraded);
+    await expect(repo.save(v2, v2.revision)).rejects.toBeInstanceOf(StoreConflictError);
+  });
   it('combines native payload migration and old catalog expansion in one revision', async () => {
     const db = new TestSqliteDatabase(),
       old = legacy();

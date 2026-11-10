@@ -1,4 +1,5 @@
-import { isNativeApp, loadNativeRuntime } from '../platform/native';
+import { Capacitor } from '@capacitor/core';
+import { loadNativeRuntime } from '../platform/native';
 
 export const NATIVE_CLOUD_URL = 'https://jianlibao-training-raitox.netlify.app/.netlify/functions/sync';
 interface CloudRequest { method: string; headers: Record<string, string>; body?: string; signal: AbortSignal }
@@ -28,7 +29,8 @@ export function createNativeCloudRequest(load: () => Promise<{ http: NativeHttp 
 }
 const nativeRequest = createNativeCloudRequest(async () => ({ http: (await loadNativeRuntime()).http }));
 export function requestCloud(options: CloudRequest): Promise<Response> {
-  if (isNativeApp()) return nativeRequest(options);
+  const platform = Capacitor.getPlatform();
+  if (platform === 'ios' || platform === 'android') return nativeRequest(options);
   return fetch('/.netlify/functions/sync', { method: options.method, headers: options.headers, body: options.body,
     signal: options.signal, cache: 'no-store', credentials: 'omit', redirect: 'error' });
 }

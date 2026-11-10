@@ -36,6 +36,9 @@ export class SqliteRepository implements Repository {
       const current = await migrateLegacyWorkspace(tx, this.readLegacy);
       if (current.revision !== expectedRevision) throw new StoreConflictError();
       if (current.revision >= Number.MAX_SAFE_INTEGER - 1) throw new Error('本地数据版本已达上限，请先导出备份');
+      if (current.schemaVersion === 2 && validated.schemaVersion === 3) {
+        await tx.run('INSERT OR IGNORE INTO storage_meta (key, value) VALUES (?, ?)', ['appdata-v2-before-v3', JSON.stringify(current)]);
+      }
       const next = { ...validated, revision: current.revision + 1 };
       const changes = await tx.run("UPDATE workspace SET revision=?, payload=? WHERE id='main' AND revision=?", [
         next.revision,

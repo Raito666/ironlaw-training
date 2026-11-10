@@ -1,5 +1,5 @@
-import type { AppData, AppSettings, BodyMetric, Exercise, LegacyAppData, MeasurementKey, Session, SessionExercise, SetRecord, TemplateItem, WorkoutTemplate } from '../domain/types';
-import { migrateAppDataV1 } from './migrations';
+import type { AppData, AppSettings, BodyMetric, Exercise, LegacyAppData, MeasurementKey, Session, SessionExercise, SetRecord, TemplateItem, TrainingDate, WorkoutTemplate } from '../domain/types';
+import { migrateAppDataV1, withTrainingSchedule } from './migrations';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_TIME = 4_102_444_800_000;
@@ -7,7 +7,7 @@ type RecordValue = Record<string, unknown>;
 export interface ImportPreview {
   added: number;
   unchanged: number;
-  conflicts: Array<{ id: string; collection: 'exercises' | 'templates' | 'sessions' | 'bodyMetrics'; name: string }>;
+  conflicts: Array<{ id: string; collection: 'exercises' | 'templates' | 'sessions' | 'bodyMetrics' | 'trainingSchedule'; name: string }>;
   settingsChanged: boolean;
 }
 
@@ -138,21 +138,45 @@ function bodyMetric(value: unknown, path: string): BodyMetric {
   };
 }
 
+export const trainingReminderLeads = [0, 5, 15, 30, 60] as const;
+export function validateTrainingSchedule(value: unknown): TrainingDate[] {
+  const records = array(value, 'data.trainingSchedule', 2000, (entry, path): TrainingDate => {
+    const v = object(entry, path, ['id', 'templateId', 'date', 'time', 'lead', 'choices']);
+    const templateId = id(v.templateId, `${path}.templateId`);
+    const date = string(v.date, `${path}.date`, 10, true);
+    iso(`${date}T00:00:00.000Z`, `${path}.date`);
+    const time = string(v.time, `${path}.time`, 5, true);
+    if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time)) fail(`${path}.time`);
+    const lead = number(v.lead, `${path}.lead`, 60, true);
+    if (!trainingReminderLeads.some((option) => option === lead)) fail(`${path}.lead`);
+    if (!v.choices || typeof v.choices !== 'object' || Array.isArray(v.choices) || Object.keys(v.choices).length > 30) fail(`${path}.choices`);
+    const choices = Object.fromEntries(Object.entries(v.choices).map(([key, exercise]) => {
+      if (!key.startsWith(`${templateId}/`)) fail(`${path}.choices`);
+      id(key.slice(templateId.length + 1), `${path}.choices`);
+      return [key, id(exercise, `${path}.choices`)];
+    }));
+    return { id: id(v.id, `${path}.id`), templateId, date, time, lead, choices };
+  });
+  unique(records, 'data.trainingSchedule');
+  return records;
+}
+
 /** Strict version-aware parsing, followed by an explicit pure v1 migration; never clears data. */
 export function validateAppData(value: unknown): AppData {
-  const header = object(value, 'data', ['schemaVersion', 'revision', 'exercises', 'templates', 'sessions', 'settings', 'onboarded'], ['bodyMetrics']);
-  if (header.schemaVersion !== 1 && header.schemaVersion !== 2) fail('data.schemaVersion', '不支持的数据版本，请使用兼容版本打开；原数据已保留');
+  const header = object(value, 'data', ['schemaVersion', 'revision', 'exercises', 'templates', 'sessions', 'settings', 'onboarded'], ['bodyMetrics', 'trainingSchedule']);
+  if (header.schemaVersion !== 1 && header.schemaVersion !== 2 && header.schemaVersion !== 3) fail('data.schemaVersion', '不支持的数据版本，请使用兼容版本打开；原数据已保留');
   const version = header.schemaVersion;
-  const v = object(value, 'data', ['schemaVersion', 'revision', 'exercises', 'templates', 'sessions', 'settings', 'onboarded', ...(version === 2 ? ['bodyMetrics'] : [])]);
+  const recordVersion = version === 1 ? 1 : 2;
+  const v = object(value, 'data', ['schemaVersion', 'revision', 'exercises', 'templates', 'sessions', 'settings', 'onboarded', ...(version >= 2 ? ['bodyMetrics'] : []), ...(version === 3 ? ['trainingSchedule'] : [])]);
   const exercises = array(v.exercises, 'data.exercises', 5000, exercise);
   const templates = array(v.templates, 'data.templates', 1000, template);
-  const sessions = array(v.sessions, 'data.sessions', 10000, (entry, key) => session(entry, key, version));
+  const sessions = array(v.sessions, 'data.sessions', 10000, (entry, key) => session(entry, key, recordVersion));
   unique(exercises, 'data.exercises'); unique(templates, 'data.templates'); unique(sessions, 'data.sessions');
   const exerciseIds = new Set(exercises.map((item) => item.id));
   for (const item of templates) for (const entry of item.items) if (!exerciseIds.has(entry.exerciseId)) fail('data.templates', '模板引用了不存在的动作');
   if (sessions.filter(isDraft).length > 1) fail('data.sessions', '一份数据只能包含一场进行中、暂停或待回顾训练');
   // A session embeds its own exercise snapshot. Removed/renamed library entries and templates do not invalidate history.
-  const common = { revision: number(v.revision, 'data.revision', Number.MAX_SAFE_INTEGER - 1, true), exercises, templates, sessions, settings: settings(v.settings, 'data.settings', version), onboarded: boolean(v.onboarded, 'data.onboarded') };
+  const common = { revision: number(v.revision, 'data.revision', Number.MAX_SAFE_INTEGER - 1, true), exercises, templates, sessions, settings: settings(v.settings, 'data.settings', recordVersion), onboarded: boolean(v.onboarded, 'data.onboarded') };
   if (version === 1) {
     const { showRpe: _showRpe, ...oldSettings } = common.settings;
     const old: LegacyAppData = { ...common, schemaVersion: 1, settings: oldSettings };
@@ -161,7 +185,8 @@ export function validateAppData(value: unknown): AppData {
   const bodyMetrics = array(v.bodyMetrics, 'data.bodyMetrics', 50000, bodyMetric);
   unique(bodyMetrics, 'data.bodyMetrics');
   if (new Set(bodyMetrics.map(item => item.date)).size !== bodyMetrics.length) fail('data.bodyMetrics', '有重复日期');
-  return { ...common, schemaVersion: 2, bodyMetrics };
+  const data: AppData = { ...common, schemaVersion: 2, bodyMetrics };
+  return version === 3 ? withTrainingSchedule(data, validateTrainingSchedule(v.trainingSchedule)) : data;
 }
 
 /** Web/native cloud documents share only these collections. Keychain references,
@@ -186,7 +211,7 @@ function canonical(value: unknown): string {
 
 export function exportBackup(data: AppData): string {
   const validated = validateAppData(data);
-  const text = JSON.stringify({ app: 'jianlibao', formatVersion: 2, exportedAt: new Date().toISOString(), data: validated }, null, 2);
+  const text = JSON.stringify({ app: 'jianlibao', formatVersion: validated.schemaVersion, exportedAt: new Date().toISOString(), data: validated }, null, 2);
   if (new TextEncoder().encode(text).byteLength > MAX_BYTES) throw new Error('备份超过 10 MB；请联系开发者提供分批导出支持');
   return text;
 }
@@ -197,7 +222,7 @@ export function parseBackup(text: string): AppData {
   try { parsed = JSON.parse(text); } catch { throw new Error('备份不是有效的 JSON 文件'); }
   const v = object(parsed, '文件', ['app', 'formatVersion', 'exportedAt', 'data']);
   if (v.app !== 'jianlibao') fail('app', '这不是健力宝备份');
-  if (v.formatVersion !== 1 && v.formatVersion !== 2) fail('formatVersion', '不支持的备份版本，请使用兼容版本导入');
+  if (v.formatVersion !== 1 && v.formatVersion !== 2 && v.formatVersion !== 3) fail('formatVersion', '不支持的备份版本，请使用兼容版本导入');
   if (!v.data || typeof v.data !== 'object' || !('schemaVersion' in v.data) || v.data.schemaVersion !== v.formatVersion) fail('formatVersion', '备份版本与数据版本不一致');
   iso(v.exportedAt, 'exportedAt');
   const validated = validateAppData(v.data);
@@ -219,6 +244,13 @@ export function previewImport(current: AppData, incoming: AppData): ImportPrevie
     if (!existing) result.added++;
     else if (sameBody(existing, item)) result.unchanged++;
     else result.conflicts.push({ id: item.id, collection: 'bodyMetrics', name: `${item.date} 身体数据` });
+  }
+  const localDates = new Map((current.trainingSchedule ?? []).map((item) => [item.id, item]));
+  for (const item of incoming.trainingSchedule ?? []) {
+    const existing = localDates.get(item.id);
+    if (!existing) result.added++;
+    else if (canonical(existing) === canonical(item)) result.unchanged++;
+    else result.conflicts.push({ id: item.id, collection: 'trainingSchedule', name: `${item.date} ${item.time}` });
   }
   return result;
 }
@@ -259,5 +291,6 @@ export function mergeImport(current: AppData, incoming: AppData, resolution: 'ke
   }
   if (sessions.filter(isDraft).length > 1) throw new Error('导入会产生两场未完成训练。请先结束或取消本机训练，再导入这份备份。');
   // Preferences and onboarding belong to this browser; importing history never changes the theme or export reminder.
-  return validateAppData({ ...local, exercises: merge(local.exercises, imported.exercises), templates: merge(local.templates, imported.templates), sessions, bodyMetrics });
+  const merged = { ...local, exercises: merge(local.exercises, imported.exercises), templates: merge(local.templates, imported.templates), sessions, bodyMetrics };
+  return validateAppData(imported.trainingSchedule ? withTrainingSchedule(merged, merge(local.trainingSchedule ?? [], imported.trainingSchedule)) : merged);
 }

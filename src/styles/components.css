@@ -94,6 +94,46 @@ button.exercise-row:hover { color: var(--accent-text); }
 .template-actions { gap: var(--space-1); justify-content: space-between; }
 .template-actions .btn { padding-left: var(--space-2); padding-right: var(--space-2); font-size: var(--text-sm); }
 .template-actions .icon-button { margin-left: auto; width: 44px; min-height: 44px; border: 0; border-radius: var(--radius-md); background: transparent; }
+.preset-plans { display: grid; gap: var(--space-3); margin-bottom: var(--space-5); }
+.preset-plans p, .preset-plans a, .preset-day summary > span { font-size: var(--text-sm); }
+.preset-plans h2, .preset-overview h3 { margin-bottom: var(--space-1); }
+.preset-plans .preset-divisions, .preset-plans .preset-variants { display: grid; }
+.preset-divisions { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.preset-variants { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.preset-variants > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+.preset-variants > button { white-space: normal; overflow-wrap: anywhere; }
+.preset-plans .segmented > button { min-height: 44px; padding-inline: var(--space-1); }
+.preset-overview { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.preset-overview a { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent-text); text-decoration: underline; }
+.preset-days { display: grid; gap: var(--space-2); }
+.preset-day { border: 1px solid var(--line); border-radius: var(--radius-md); padding-inline: var(--space-3); }
+.preset-day summary { min-height: 44px; display: list-item; align-content: center; cursor: pointer; }
+.preset-day summary > span { display: inline-block; margin-inline-start: var(--space-2); }
+.preset-day[open] { padding-bottom: var(--space-3); }
+.preset-day ol { list-style: none; padding: 0; margin: 0 0 var(--space-2); }
+.preset-day h4 { margin: var(--space-2) 0; color: var(--muted); font-size: var(--text-sm); }
+.preset-day li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-1) var(--space-3); padding-block: var(--space-2); border-top: 1px solid var(--line); font-size: var(--text-sm); }
+.preset-day .btn { margin-top: var(--space-2); }
+.preset-alternatives { display: flex; flex-wrap: wrap; gap: var(--space-2); flex-basis: 100%; }
+.preset-alternatives .btn { margin: 0; min-height: 44px; max-width: 100%; white-space: normal; }
+.preset-alternatives [aria-pressed='true'] { border-color: var(--accent); color: var(--accent); }
+.preset-guide, .training-date-form { border: 1px solid var(--line); border-radius: var(--radius-md); padding-inline: var(--space-3); }
+.preset-guide summary, .training-date-form summary { min-height: 44px; align-content: center; cursor: pointer; }
+.preset-guide dl { display: grid; gap: var(--space-3); margin: 0 0 var(--space-3); }
+.preset-guide dd { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
+.training-date-form { margin-top: var(--space-3); min-width: 0; }
+.training-date-form form { display: grid; gap: var(--space-2); padding-bottom: var(--space-3); }
+.training-date-form form > .btn { justify-self: start; }
+.training-date-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: var(--space-2); }
+.training-date-fields input, .training-date-fields select { max-width: 100%; min-width: 0; }
+.training-schedule-jump { margin-bottom: var(--space-3); }
+.training-schedule, .training-reminder { display: grid; gap: var(--space-2); margin-bottom: var(--space-4); scroll-margin-top: var(--space-4); }
+.training-reminder .btn { justify-self: start; }
+.training-schedule h2 { display: flex; align-items: center; gap: var(--space-2); }
+.training-schedule ul { list-style: none; margin: 0; padding: 0; }
+.training-schedule li { display: grid; gap: var(--space-2); padding-block: var(--space-3); border-top: 1px solid var(--line); }
+.training-schedule-actions { gap: var(--space-2); }
+.training-schedule-actions .btn { min-height: 44px; max-width: 100%; white-space: normal; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); }
 .field { display: grid; min-width: 0; align-content: start; gap: var(--space-2); font-size: var(--text-sm); color: var(--text); }
 .field.full { grid-column: 1 / -1; }

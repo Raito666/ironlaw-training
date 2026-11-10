@@ -4,7 +4,9 @@
 
 **[立即打开网页版](https://jianlibao-training-raitox.netlify.app/mobile/)** · 手机和电脑均可直接访问。
 
-[下载各平台版本](https://github.com/Raito666/ironlaw-training/releases/tag/v0.4.0-20261106) · [图文使用说明](docs/USAGE.md) · [开发与自托管](docs/DEVELOPMENT.md)
+[下载各平台版本](https://github.com/Raito666/ironlaw-training/releases/tag/v0.4.0-20261110) · [图文使用说明](docs/USAGE.md) · [开发与自托管](docs/DEVELOPMENT.md)
+
+**本版新增训练排期**。从精选模板一次排好整套训练，按周重复、单场改期或取消。手机与电脑连接同一个加密同步空间后共享排期。 [直达原图完整版](https://jianlibao-training-raitox.netlify.app/mobile/#/plans?preset=photo-complete)
 
 ![铁律桌面版的训练主页，使用演示数据](docs/screenshots/desktop.png)
 
@@ -20,6 +22,10 @@
 所有下载包来自同一份 Web 资源。首次换设备前，可在原来的「我」页导出备份，再在新设备导入。
 
 ## 看看界面
+
+| 精选模板 | 训练排期 |
+| :---: | :---: |
+| <img src="docs/screenshots/templates.png" width="250" alt="谭成义原图三分化完整版"> | <img src="docs/screenshots/schedule.png" width="250" alt="训练排期与改期入口"> |
 
 | 训练记录 | 动作讲解 | 历史与统计 | 身体数据 |
 | :---: | :---: | :---: | :---: |

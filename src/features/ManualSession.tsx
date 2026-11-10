@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { AppData } from "../domain/types";
+import { isRetiredStarterTemplate } from "../domain/seed";
 import { dayKey } from "../domain/analytics";
 import {
   createSession,
@@ -200,7 +201,7 @@ export default function ManualSession({
               options={[
                 { value: "", label: "自由选择动作" },
                 ...data.templates
-                  .filter((t) => !t.archived)
+                  .filter((t) => !t.archived && !isRetiredStarterTemplate(t))
                   .map((t) => ({ value: t.id, label: t.name })),
               ]}
             />

@@ -9,6 +9,10 @@ import { exportTextFile, isIos } from "../platform/native";
 const labels: Record<string, string> = {
   name: "名称",
   date: "日期",
+  time: "训练时间",
+  lead: "提前提醒（分钟）",
+  templateId: "训练模板",
+  choices: "替代动作",
   weightKg: "重量（kg）",
   bodyFatPct: "体脂率（%）",
   measurements: "围度（cm）",

@@ -1,5 +1,6 @@
 import type { AppData, WorkoutTemplate } from '../../domain/types';
 import { uid } from '../../domain/training';
+import { isRetiredStarterTemplate } from '../../domain/seed';
 import Icon from '../../components/Icon';
 import { useRef, useState } from 'react';
 import { useListMotion } from '../../motion/presentation';
@@ -13,6 +14,10 @@ import {
   type SharedTemplate,
 } from '../portable-content';
 import { usePendingMutation } from '../pending-mutation';
+import PresetPlans from './PresetPlans';
+import { resolvePresetDay } from '../../content/training-presets';
+import { TrainingDateForm, TrainingSchedulePanel } from './TrainingSchedule';
+import type { TrainingScheduleController } from './useTrainingSchedule';
 type Props = {
   data: AppData;
   templates: WorkoutTemplate[];
@@ -24,6 +29,7 @@ type Props = {
   setTemplateEditor: (template: WorkoutTemplate | 'new') => void;
   setArchiveTemplate: (template: WorkoutTemplate) => void;
   setShowArchived: (show: boolean) => void;
+  schedule: TrainingScheduleController;
 };
 export default function PlansPage({
   data,
@@ -36,6 +42,7 @@ export default function PlansPage({
   setTemplateEditor,
   setArchiveTemplate,
   setShowArchived,
+  schedule,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
@@ -68,7 +75,7 @@ export default function PlansPage({
   );
   const templateCards = (
     <div className="template-grid" ref={ref}>
-      {(showArchived ? data.templates : templates).map((t) => (
+      {(showArchived ? data.templates.filter((t) => !isRetiredStarterTemplate(t)) : templates).map((t) => (
         <section className="card template-card" key={t.id}>
           <div>
             <h2 className="truncate" title={t.name}>
@@ -143,6 +150,7 @@ export default function PlansPage({
                   <Icon name="trash" size={16} />
                 </button>
               </div>
+              <TrainingDateForm template={t} schedule={schedule} />
             </>
           )}
         </section>
@@ -151,6 +159,14 @@ export default function PlansPage({
   );
   return (
     <>
+      {schedule.entries.length > 0 && (
+        <button className="btn btn-secondary training-schedule-jump" type="button" onClick={() => document.getElementById('training-schedule')?.scrollIntoView({ block: 'start' })}>
+          <Icon name="calendar" /> 查看已安排的训练（{schedule.entries.length}）
+        </button>
+      )}
+      <PresetPlans data={data} writable={writable} mutate={mutate} retry={retry} openStart={openStart} schedule={schedule} />
+      <TrainingSchedulePanel schedule={schedule} sessions={data.sessions} writable={writable} openStart={openStart}
+        resolveTemplate={(entry) => resolvePresetDay(entry.templateId, data.templates.find((template) => template.id === entry.templateId), entry.choices)} />
       <div className="section-heading">
         <div>
           <h2>训练日模板</h2>

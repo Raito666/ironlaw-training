@@ -1,6 +1,7 @@
 import Presence from "../motion/Presence";
 import { useEffect, useRef, useState } from "react";
 import type { AppData } from "../domain/types";
+import { isRetiredStarterTemplate } from "../domain/seed";
 import {
   exportBackup,
   mergeImport,
@@ -192,7 +193,7 @@ export default function BackupSettings({
               <small>
                 {data.sessions.filter((s) => s.status === "completed").length}{" "}
                 场已完成训练 ·{" "}
-                {data.templates.filter((t) => !t.archived).length} 个模板 ·{" "}
+                {data.templates.filter((t) => !t.archived && !isRetiredStarterTemplate(t)).length} 个模板 ·{" "}
                 {data.exercises.length} 个动作 · {data.bodyMetrics.length}{" "}
                 条身体记录
               </small>
@@ -390,7 +391,9 @@ export default function BackupSettings({
                             ? "模板"
                             : c.collection === "bodyMetrics"
                               ? "身体数据"
-                              : "动作"}
+                              : c.collection === "trainingSchedule"
+                                ? "训练排期"
+                                : "动作"}
                       </span>{" "}
                       {c.name}
                     </div>

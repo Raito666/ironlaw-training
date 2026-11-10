@@ -1,4 +1,7 @@
-import { isWorkSet } from './domain/sets';
+import { isWarmupTemplateItem, isWorkSet } from './domain/sets';
+import { ensurePresetExercises, presetExerciseById } from './content/training-presets';
+import { TrainingReminder } from './features/plans/TrainingSchedule';
+import { useTrainingSchedule } from './features/plans/useTrainingSchedule';
 import Presence from './motion/Presence';
 import AppShell from './app/AppShell';
 import BrandMark from './components/BrandMark';
@@ -13,6 +16,7 @@ import TodayPage from './features/today/TodayPage';
 import PlansPage from './features/plans/PlansPage';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { AppData, Exercise, Session, WorkoutTemplate } from './domain/types';
+import { isRetiredStarterTemplate } from './domain/seed';
 import { completeSession, createSession, reviewSession, sessionStats, uid } from './domain/training';
 import { useWorkspace } from './hooks/useWorkspace';
 import { useCloudSync } from './sync/useCloudSync';
@@ -35,6 +39,7 @@ const isDraft = (s: Session) => ['active', 'paused', 'review'].includes(s.status
 export default function App() {
   useNativeInterface();
   const workspace = useWorkspace();
+  const schedule = useTrainingSchedule(workspace);
   const syncProvider = useSyncProvider();
   const cloud = useCloudSync({
     ...workspace,
@@ -148,7 +153,7 @@ export default function App() {
   const completed = data.sessions
     .filter((s) => s.status === 'completed')
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
-  const templates = data.templates.filter((t) => !t.archived);
+  const templates = data.templates.filter((t) => !t.archived && !isRetiredStarterTemplate(t));
   const date = new Date();
   const monthSessions = completed.filter((s) => s.date.startsWith(localDate(date).slice(0, 7)));
   const monthlySeconds = monthSessions.reduce((n, s) => n + sessionStats(s).activeSeconds, 0);
@@ -184,12 +189,15 @@ export default function App() {
     const template = startTemplate === 'free' ? null : startTemplate;
     const ok = await mutate((d) => {
       if (d.sessions.some(isDraft)) throw new Error('请先继续已有草稿');
-      const session = createSession(template, d.exercises);
-      session.exercises = session.exercises.map((item) =>
-        seedExercise(item, d.sessions, session.date, session.id),
-      );
+      const next = template ? ensurePresetExercises(d, [template]) : d;
+      const session = createSession(template, next.exercises);
+      if (!template?.items.some(isWarmupTemplateItem)) {
+        session.exercises = session.exercises.map((item) =>
+          seedExercise(item, d.sessions, session.date, session.id),
+        );
+      }
       if (!template) session.restDuration = d.settings.defaultRest;
-      return { ...d, onboarded: true, sessions: [...d.sessions, session] };
+      return { ...next, onboarded: true, sessions: [...next.sessions, session] };
     });
     setStartTemplate(null);
     if (ok) go('workout');
@@ -327,8 +335,8 @@ export default function App() {
                     <div className="exercise-list">
                       {startTemplate.items.map((item) => (
                         <div className="exercise-row" key={item.id}>
-                          <strong>{data.exercises.find((e) => e.id === item.exerciseId)?.name}</strong>
-                          <span>{item.sets} 组</span>
+                          <strong>{(data.exercises.find((e) => e.id === item.exerciseId) ?? presetExerciseById.get(item.exerciseId))?.name}</strong>
+                          <span>{isWarmupTemplateItem(item) ? '热身 · ' : ''}{item.sets} 组</span>
                         </div>
                       ))}
                     </div>
@@ -460,6 +468,11 @@ export default function App() {
         </>
       }
     >
+      {page !== 'workout' && schedule.entries.length > 0 && <TrainingReminder entries={schedule.entries} sessions={data.sessions}
+        onOpen={() => {
+          if (page === 'plans') document.getElementById('training-schedule')?.scrollIntoView({ block: 'start' });
+          else go('plans');
+        }} />}
       {page === 'today' && (
         <TodayPage
           data={data}
@@ -488,6 +501,7 @@ export default function App() {
           setTemplateEditor={setTemplateEditor}
           setArchiveTemplate={setArchiveTemplate}
           setShowArchived={setShowArchived}
+          schedule={schedule}
         />
       )}
       {page === 'exercises' && (

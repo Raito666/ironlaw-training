@@ -6,6 +6,7 @@ import { getE2ERunDirectory } from '../../scripts/e2e-output.mjs';
 import { createSyncHandler } from '../../netlify/functions/lib/sync-handler.mjs';
 import { credentials } from '../../src/sync/crypto';
 import { storedWorkspace, backupFile } from './helpers';
+import { trainingScheduleKey } from '../../src/features/plans/schedule';
 
 const folder = joinPath(getE2ERunDirectory(), 'cloud-sync');
 const live = process.env.JLB_CLOUD_LIVE === '1';
@@ -74,6 +75,61 @@ async function body(page: Page, weight: number, date = '2026-10-26') {
   await expect(dialog).not.toBeVisible();
   await expect.poll(async () => (await storedWorkspace(page)).bodyMetrics.find(m => m.date === date)?.weightKg).toBe(weight);
 }
+
+test('排期双设备迁移、整套每周重复、改期和取消同步', async ({ browser, baseURL }) => {
+  test.setTimeout(150000);
+  const handler = fakeCloud();
+  const a = await browser.newContext({ baseURL, serviceWorkers, viewport: { width: 1440, height: 900 }, timezoneId: 'Asia/Shanghai' });
+  const b = await browser.newContext({ baseURL, serviceWorkers, viewport: { width: 320, height: 760 }, hasTouch: true, timezoneId: 'Asia/Shanghai' });
+  await route(a, handler); await route(b, handler);
+  const pa = await a.newPage(), pb = await b.newPage();
+  const oldEntry = { id: 'legacy-schedule-01', templateId: 'preset-full-full', date: '2030-02-01', time: '18:00', lead: 15, choices: {} };
+  const plans = '/mobile/#/plans?preset=photo-complete';
+  const count = (page: Page) => expect.poll(async () => (await storedWorkspace(page)).trainingSchedule?.length ?? 0, { timeout: 30_000 });
+  const finishSync = async (page: Page) => {
+    await page.goto('/#/settings');
+    await sync(page);
+    await expect(page.getByRole('button', { name: '立即同步', exact: true })).toBeEnabled();
+  };
+  try {
+    await settings(pa); await body(pa, 70); const key = await create(pa); await join(pb, key);
+    await pa.evaluate(([key, entry]) => localStorage.setItem(key as string, JSON.stringify([entry])), [trainingScheduleKey, oldEntry]);
+    await pa.goto(plans);
+    await count(pa).toBe(1);
+    await expect.poll(() => pa.evaluate((key) => localStorage.getItem(key), trainingScheduleKey)).toBeNull();
+    const panel = pa.getByRole('region', { name: '精选分化模板' });
+    await panel.getByRole('button', { name: '弹力带平推', exact: true }).click();
+    await panel.getByText('安排整套模板', { exact: true }).click();
+    const form = panel.getByRole('form', { name: '安排整套模板' });
+    await form.getByLabel(/首周第 1 天/).fill('2030-02-04');
+    await form.getByLabel(/首周第 2 天/).fill('2030-02-07');
+    await form.getByLabel(/每周重复/).selectOption('2');
+    await form.getByRole('button', { name: '保存排期' }).click();
+    await expect(form.getByRole('status')).toContainText('已安排 6 场训练');
+    await count(pa).toBe(7);
+    await finishSync(pa); await finishSync(pb); await count(pb).toBe(7);
+    const records = (await storedWorkspace(pb)).trainingSchedule!;
+    const first = records.find((entry) => entry.date === '2030-02-04')!;
+    expect(first.choices).toEqual({ 'preset-photo-complete-chest/reference-high-cable-chest-press': 'reference-band-chest-press' });
+    expect(records.map(({ date }) => date).sort()).toEqual(['2030-02-01', '2030-02-04', '2030-02-07', '2030-02-08', '2030-02-11', '2030-02-14', '2030-02-15']);
+    await pb.goto(plans);
+    const schedule = pb.getByRole('region', { name: '训练排期' });
+    const firstCard = schedule.getByRole('listitem').filter({ hasText: '2030-02-04' });
+    await firstCard.getByText('改期', { exact: true }).click();
+    await firstCard.getByLabel('训练日期', { exact: true }).fill('2030-02-05');
+    expect(await schedule.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+    await firstCard.getByRole('button', { name: '保存改期' }).click();
+    await expect(schedule.getByText('2030-02-05 · 19:00 · 提前 15 分钟提醒')).toBeVisible();
+    await schedule.getByRole('listitem').filter({ hasText: '2030-02-14' }).getByRole('button', { name: '取消这场排期' }).click();
+    await count(pb).toBe(6);
+    await finishSync(pb); await finishSync(pa); await count(pa).toBe(6);
+    const desktop = await storedWorkspace(pa);
+    expect(desktop.trainingSchedule?.find(({ id }) => id === first.id)).toEqual({ ...first, date: '2030-02-05' });
+    expect(desktop.trainingSchedule?.some(({ date }) => date === '2030-02-14')).toBe(false);
+    expect(desktop.bodyMetrics[0]?.weightKg).toBe(70);
+    await pa.reload(); await count(pa).toBe(6);
+  } finally { await a.close(); await b.close(); }
+});
 
 test('两台设备往返同步、刷新恢复和密钥隔离', async ({ browser, baseURL }) => {
   test.setTimeout(90000);

@@ -1,6 +1,7 @@
 import type { AppData, BodyMetric, Exercise, WorkoutTemplate } from '../domain/types';
 import { validateAppData } from '../data/backup';
 import { uid } from '../domain/training';
+import { isWarmupTemplateItem, warmupTemplateItemId } from '../domain/sets';
 
 export interface SharedTemplate {
   format: 'ironlaw-template';
@@ -72,7 +73,7 @@ export function importTemplate(data: AppData, shared: SharedTemplate, makeId = u
     updatedAt: new Date().toISOString(),
     items: shared.template.items.map((item) => ({
       ...item,
-      id: makeId(),
+      id: isWarmupTemplateItem(item) ? warmupTemplateItemId(makeId()) : makeId(),
       exerciseId: mapped.get(item.exerciseId)!,
     })),
   };
@@ -89,7 +90,7 @@ export function printableTemplate(template: WorkoutTemplate, exercises: Exercise
   const rows = template.items
     .map((item, index) => {
       const exercise = exercises.find((candidate) => candidate.id === item.exerciseId);
-      return `<tr><td>${index + 1}</td><td>${escapeHtml(exercise?.name ?? '动作已移除')}<small>${escapeHtml(exercise?.equipment ?? '')}</small></td><td>${item.sets}</td><td>${escapeHtml(exercise?.kind === 'duration' ? `${item.durationSeconds} 秒` : `${item.reps} 次`)}</td><td>${exercise?.kind === 'weight-reps' ? `${item.weightKg} kg` : '—'}</td><td>□ □ □ □ □</td></tr>`;
+      return `<tr><td>${index + 1}</td><td>${escapeHtml(exercise?.name ?? '动作已移除')}<small>${isWarmupTemplateItem(item) ? '热身 · ' : ''}${escapeHtml(exercise?.equipment ?? '')}</small></td><td>${item.sets}</td><td>${escapeHtml(exercise?.kind === 'duration' ? `${item.durationSeconds} 秒` : `${item.reps} 次`)}</td><td>${exercise?.kind === 'weight-reps' ? `${item.weightKg} kg` : '—'}</td><td>□ □ □ □ □</td></tr>`;
     })
     .join('');
   return `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(template.name)} · 铁律训练模板</title><style>body{font:16px/1.75 system-ui,sans-serif;color:#172019;background:#fff;max-width:960px;margin:32px auto;padding:16px}h1{font-size:26px}p{white-space:pre-wrap;overflow-wrap:anywhere}table{width:100%;border-collapse:collapse}td,th{padding:12px 8px;border-bottom:1px solid #999;text-align:left;overflow-wrap:anywhere}small{display:block;color:#555}footer{margin-top:32px}@media print{body{margin:0;padding:0}tr{break-inside:avoid}}@media(max-width:480px){body{font-size:13px}td,th{padding:8px 4px}}</style><h1>${escapeHtml(template.name)}</h1><p>${escapeHtml(template.description)}</p><p>组间休息 ${template.restSeconds} 秒 · 日期 __________</p><table><thead><tr><th>序</th><th>动作</th><th>组数</th><th>目标</th><th>总负重</th><th>记录</th></tr></thead><tbody>${rows}</tbody></table><footer>铁律 · 目标不代表实际完成。双哑铃按两只合计的总外部负重记录。<br>在浏览器中选择“打印”即可打印或保存为 PDF。此文件不含训练历史和身体数据。</footer></html>`;
