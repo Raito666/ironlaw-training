@@ -75,7 +75,6 @@ test('本地可变字体不可用时使用系统回退，训练记录与浏览�
     expect(face).toBe('error');
     expect((await actualFonts(page, 'main h1')).some(font => font.glyphCount > 0)).toBe(true);
     await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-    await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
     await page.getByLabel('杠铃深蹲第1组总重量', { exact: true }).fill('67.5');
     await page.getByRole('button', { name: '完成杠铃深蹲第1组', exact: true }).click();
     await expect(page.locator('.save-indicator')).toContainText('已保存到本机');

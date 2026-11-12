@@ -50,7 +50,7 @@ test('原生SQLite与Web往返同步，训练/密钥导出及重开保留，备�
   let reopened: Awaited<ReturnType<typeof nativeCloudBridge>> | null = null;
   try {
     await settings(pa); await body(pa, 70); const key = await create(pa);
-    await pa.goto('/'); await pa.getByRole('button', { name: '开始今天的训练', exact: true }).click(); await pa.getByRole('button', { name: '确认开始训练', exact: true }).click();
+    await pa.goto('/'); await pa.getByRole('button', { name: '开始今天的训练', exact: true }).click();
     await pa.getByLabel('杠铃深蹲第1组总重量', { exact: true }).fill('60'); await pa.getByLabel('杠铃深蹲第1组次数', { exact: true }).fill('10');
     await pa.getByRole('button', { name: '完成杠铃深蹲第1组', exact: true }).click(); await pa.getByRole('button', { name: '提前回顾', exact: true }).click(); await pa.getByRole('button', { name: '保存训练', exact: true }).click();
     await expect.poll(() => native.data().sessions[0]?.status).toBe('completed'); await settings(pa); await sync(pa);

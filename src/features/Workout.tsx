@@ -25,6 +25,8 @@ import ExerciseDetails from "./ExerciseDetails";
 import { displayWeight } from "../domain/units";
 import { lastWorkSet, nextSuggestedSet } from "./workout/performance";
 import ExercisePicker from "../components/ExercisePicker";
+import ReplacementPicker from "./workout/ReplacementPicker";
+import { presetAlternativeIds, presetExerciseById } from "../content/training-presets";
 import TrainingTools from "./training-tools/TrainingTools";
 import type { useRestReminder } from "./workout/useRestReminder";
 export { displayWeight, fromWeight } from "../domain/units";
@@ -51,7 +53,7 @@ export default function Workout({
   writable: boolean;
   goHome: () => void;
   restReminder: ReturnType<typeof useRestReminder>;
-  addExercise: (exercise: Exercise, replaceId?: string) => Promise<boolean>;
+  addExercise: (exercise: Exercise, replaceId?: string) => Promise<string | null>;
   insertWarmups: (
     itemId: string,
     rows: Array<{ weightKg: number; reps: number }>,
@@ -60,51 +62,78 @@ export default function Workout({
   hasPendingAction: boolean;
 }) {
   const now = useNow();
-  const [current, setCurrent] = useState(0);
-  const [detail, setDetail] = useState<Exercise | null>(null);
-  const [adding, setAdding] = useState(false);
-  // Preserve the original target while a failed optimistic operation is still visible.
-  const addingTarget = useRef<{ replaceId?: string; index: number }>({
-    index: 0,
+  const positionKey = "jianlibao.training-position";
+  const [position, setPosition] = useState(() => {
+    const initial = session.exercises.find((item) => item.sets.some((set) => set.status === "pending")) ?? session.exercises[0];
+    try {
+      const stored = localStorage.getItem(positionKey);
+      const id = stored?.startsWith(`${session.id}/`) ? stored.slice(session.id.length + 1) : undefined;
+      return session.exercises.find((item) => item.id === id)?.id ?? initial?.id ?? "";
+    } catch {
+      return initial?.id ?? "";
+    }
   });
-  const [selected, setSelected] = useState<Exercise | null>(
-    data.exercises[0] ?? null,
-  );
+  const [queueOpen, setQueueOpen] = useState(false);
+  const queueOrigin = useRef(0);
+  const [confirmFinish, setConfirmFinish] = useState(false);
+  const [finishError, setFinishError] = useState("");
+  const [detail, setDetail] = useState<Exercise | null>(null);
+  const [adding, setAdding] = useState<"add" | "replace" | null>(null);
+  // The optimistic result can change the current item before the repository responds.
+  const replacing = useRef<Session["exercises"][number] | null>(null);
+  const [selected, setSelected] = useState<Exercise | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [busy, setBusy] = useState(false);
+  const actionBusy = useRef(false);
   const [addError, setAddError] = useState("");
   const closeAdding = () => {
-    if (!busy)
+    if (!actionBusy.current)
       void cancelPendingAction().then((ok) => {
         if (ok) {
           setAddError("");
-          setAdding(false);
+          setSelected(null);
+          setAdding(null);
         }
       });
   };
   const [restCollapsed, setRestCollapsed] = useState(true);
   const view = useRef<HTMLDivElement>(null);
+  const toggleQueue = () => {
+    if (queueOpen) {
+      setQueueOpen(false);
+      requestAnimationFrame(() => view.current?.scrollTo({ top: queueOrigin.current, behavior: "instant" }));
+    } else {
+      queueOrigin.current = view.current?.scrollTop ?? 0;
+      setQueueOpen(true);
+      view.current?.scrollTo({ top: 0, behavior: "instant" });
+    }
+  };
   const stats = sessionStats(session, now);
   const count = session.exercises.reduce((n, e) => n + e.sets.length, 0);
+  const remaining = session.exercises.reduce((n, e) => n + e.sets.filter((set) => set.status === "pending").length, 0);
   const disabled =
     !writable || session.status === "paused" || session.status === "review";
   const rest = session.restUntil
     ? Math.max(0, Math.ceil((session.restUntil - now) / 1000))
     : 0;
-  useEffect(() => {
-    setCurrent((index) =>
-      Math.max(0, Math.min(index, session.exercises.length - 1)),
-    );
-  }, [session.exercises.length]);
+  const index = session.exercises.findIndex(({ id }) => id === position);
+  const current = index < 0 ? Math.max(0, session.exercises.findIndex((ex) => ex.sets.some((set) => set.status === "pending"))) : index;
   const item = session.exercises[current];
+  const selectItem = (id: string) => {
+    setPosition(id);
+    try {
+      localStorage.setItem(positionKey, `${session.id}/${id}`);
+    } catch {
+      // Recording remains available when position storage is disabled.
+    }
+  };
+  const setCurrent = (next: number) => {
+    if (session.exercises[next]) selectItem(session.exercises[next].id);
+  };
   const previousSet = item
     ? lastWorkSet(data.sessions, item.exercise, session.date, session.id)
     : undefined;
-  const resting = rest > 0;
-  useEffect(() => {
-    setRestCollapsed(!resting || window.innerHeight < 600);
-  }, [resting]);
   useLayoutEffect(() => {
     const root = view.current;
     if (!root) return;
@@ -154,13 +183,65 @@ export default function Workout({
         ?.style.removeProperty("--training-dock-height");
     };
   }, [session.status, item?.id]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     view.current?.scrollTo({ top: 0, behavior: "instant" });
-  }, [item?.id]);
+  }, [item?.id, session.status === "review"]);
   const pending = item?.sets.findIndex((set) => set.status === "pending") ?? -1;
+  const openPicker = (mode: "add" | "replace") => {
+    replacing.current = mode === "replace" ? item : null;
+    setSelected(null);
+    setAddError("");
+    setAdding(mode);
+  };
+  const submitMovement = async (exercise: Exercise) => {
+    if (disabled || actionBusy.current) return;
+    actionBusy.current = true;
+    setBusy(true);
+    setSelected(exercise);
+    try {
+      const id = await addExercise(exercise, replacing.current?.id);
+      if (id) {
+        selectItem(id);
+        setAdding(null);
+      } else {
+        setAddError("动作尚未保存，可重试或取消。");
+      }
+    } finally {
+      actionBusy.current = false;
+      setBusy(false);
+    }
+  };
+  const saveWorkout = async () => {
+    if (actionBusy.current) return;
+    actionBusy.current = true;
+    setBusy(true);
+    setFinishError("");
+    try {
+      if (await finish()) setConfirmFinish(false);
+      else {
+        setFinishError("保存未成功，记录还在，可再次保存。");
+        setConfirmFinish(true);
+      }
+    } finally {
+      actionBusy.current = false;
+      setBusy(false);
+    }
+  };
+  const endWorkout = () => {
+    setFinishError("");
+    if (remaining || !stats.completedSets) setConfirmFinish(true);
+    else void saveWorkout();
+  };
   const nextGroup = item
     ? `${item.exercise.name} · ${pending >= 0 ? `第${pending + 1}组` : "当前动作已记录完毕"}`
     : "先加入一个动作";
+  const original = replacing.current;
+  const alternatives = original && adding === "replace"
+    ? presetAlternativeIds(session.templateId, original.exercise.id).flatMap((id) => {
+      const exercise = data.exercises.find((candidate) => candidate.id === id) ?? presetExerciseById.get(id);
+      return exercise ? [exercise] : [];
+    })
+    : [];
   const setNote = (note: string) =>
     void update((s) => ({ ...s, note, updatedAt: new Date().toISOString() }));
   return (
@@ -197,10 +278,17 @@ export default function Workout({
             · {formatClock(stats.activeSeconds)}
           </p>
         </div>
-        <button className="btn btn-secondary" onClick={goHome}>
-          <Icon name="back" />
-          <span className="workout-return-label">返回今天</span>
-        </button>
+        <div className="workout-header-actions">
+          <button className="btn btn-secondary" onClick={goHome} disabled={busy} aria-label="返回今天">
+            <Icon name="back" />
+            <span className="workout-return-label">返回今天</span>
+          </button>
+          {session.status !== "review" && (
+            <button className="btn btn-primary workout-end" onClick={endWorkout} disabled={!writable || busy || hasPendingAction}>
+              结束训练
+            </button>
+          )}
+        </div>
       </div>
       {session.status === "review" ? (
         <SessionReview
@@ -218,9 +306,13 @@ export default function Workout({
       ) : (
         <>
           <div className="section-heading">
-            <p className="muted">
-              已完成 {stats.completedSets} / {count} 组
-            </p>
+            <div className="workout-progress-copy">
+              {item && <button type="button" className="btn btn-secondary workout-queue-toggle" aria-controls="workout-queue" aria-expanded={queueOpen}
+                onClick={toggleQueue}>
+                动作 {current + 1}/{session.exercises.length}
+              </button>}
+              <p className="muted">已完成 {stats.completedSets} / {count} 组</p>
+            </div>
             <span className="tag">
               {!session.exercises.some(
                 (ex) => ex.exercise.kind === "weight-reps",
@@ -245,6 +337,12 @@ export default function Workout({
                 transform: `scaleX(${count ? stats.completedSets / count : 0})`,
               }}
             />
+          </div>
+          <div id="workout-queue" hidden={!queueOpen}>
+            {queueOpen && <ExerciseNav session={session} current={current} setCurrent={(next) => {
+              setCurrent(next);
+              setQueueOpen(false);
+            }} />}
           </div>
           <div className="workout-grid">
             <div className="workout-main">
@@ -284,12 +382,16 @@ export default function Workout({
                             : "按次数记录，不估算有效负重"}
                       </p>
                     </div>
-                    <button
+                    <div className="workout-exercise-actions"><button
                       className="btn btn-ghost"
                       onClick={() => setDetail(item.exercise)}
                     >
                       动作说明 ↗
                     </button>
+                    {pending >= 0 && <button type="button" className="btn btn-secondary"
+                      disabled={disabled || busy || (session.exercises.length >= 30 && (!!item.note || item.sets.some((set) => set.status !== "pending")))}
+                      onClick={() => openPicker("replace")}>换动作</button>}
+                    </div>
                   </div>
                   {previousSet && (
                     <div className="previous-result">
@@ -312,6 +414,7 @@ export default function Workout({
                     disabled={disabled}
                     autoRest={data.settings.autoRest}
                     showRpe={data.settings.showRpe}
+                    previousSet={previousSet}
                   />
                   <p className="set-help">
                     待完成组为建议值，确认后才计入记录。
@@ -356,16 +459,9 @@ export default function Workout({
                     <button
                       className="btn btn-ghost"
                       disabled={disabled}
-                      onClick={() => {
-                        setSelected(item.exercise);
-                        addingTarget.current = {
-                          replaceId: item.id,
-                          index: session.exercises.length,
-                        };
-                        setAdding(true);
-                      }}
+                      onClick={() => openPicker("add")}
                     >
-                      添加 / 替换动作
+                      添加动作
                     </button>
                     <button
                       className="btn btn-ghost"
@@ -419,22 +515,27 @@ export default function Workout({
                     <button
                       className="btn btn-secondary"
                       disabled={!current}
-                      onClick={() => setCurrent((n) => n - 1)}
+                      onClick={() => setCurrent(current - 1)}
+                      aria-label="上一动作"
                     >
-                      上一动作
+                      <Icon name="back" size={16} />
+                      <span className="workout-previous-label">上一动作</span>
                     </button>
+                    <button type="button" className="btn btn-secondary workout-queue-mobile"
+                      aria-controls="workout-queue" aria-expanded={queueOpen} aria-label={`动作 ${current + 1}/${session.exercises.length}`}
+                      onClick={toggleQueue}>{current + 1}/{session.exercises.length} <span>动作</span></button>
                     <button
                       className="btn btn-primary"
                       onClick={() => {
                         if (current < session.exercises.length - 1)
-                          setCurrent((n) => n + 1);
-                        else void update((s) => reviewSession(s));
+                          setCurrent(current + 1);
+                        else endWorkout();
                       }}
-                      disabled={!writable || session.status === "paused"}
+                      disabled={!writable || session.status === "paused" || busy}
                     >
                       {current < session.exercises.length - 1
                         ? "下一动作"
-                        : "完成并回顾"}
+                        : "完成本次训练"}
                       <Icon name="arrow" />
                     </button>
                   </div>
@@ -447,12 +548,7 @@ export default function Workout({
                   <button
                     className="btn btn-primary"
                     disabled={disabled}
-                    onClick={() => {
-                      addingTarget.current = {
-                        index: session.exercises.length,
-                      };
-                      setAdding(true);
-                    }}
+                    onClick={() => openPicker("add")}
                   >
                     添加动作
                   </button>
@@ -468,11 +564,6 @@ export default function Workout({
                 collapsed={restCollapsed}
                 setCollapsed={setRestCollapsed}
                 nextGroup={nextGroup}
-              />
-              <ExerciseNav
-                session={session}
-                current={current}
-                setCurrent={setCurrent}
               />
               <div className="row wrap">
                 <button
@@ -511,10 +602,10 @@ export default function Workout({
           />
         )}
       </Presence>
-      <Presence interruptKey={item?.id}>
+      <Presence interruptKey={session.id}>
         {adding && (
           <Modal
-            title="加入训练的动作"
+            title={adding === "replace" ? "替换剩余组" : "加入训练的动作"}
             onClose={closeAdding}
             footer={
               <>
@@ -525,69 +616,58 @@ export default function Workout({
                 >
                   取消
                 </button>
-                {item && (
-                  <button
-                    className="btn btn-secondary"
-                    disabled={disabled || !selected || busy}
-                    onClick={async () => {
-                      if (!selected) return;
-                      setBusy(true);
-                      if (
-                        await addExercise(
-                          selected,
-                          addingTarget.current.replaceId,
-                        )
-                      )
-                        setAdding(false);
-                      else
-                        setAddError(
-                          "动作尚未保存，可以重试或取消；不会重复追加。",
-                        );
-                      setBusy(false);
-                    }}
-                  >
-                    替换当前动作
-                  </button>
-                )}
-                <button
+                {(adding === "add" || addError) && <button
                   className="btn btn-primary"
                   disabled={
                     disabled ||
-                    (session.exercises.length >= 30 && !hasPendingAction) ||
+                    (adding === "add" && session.exercises.length >= 30 && !hasPendingAction) ||
                     !selected ||
                     busy
                   }
-                  onClick={async () => {
-                    if (!selected) return;
-                    setBusy(true);
-                    if (await addExercise(selected)) {
-                      setCurrent(addingTarget.current.index);
-                      setAdding(false);
-                    } else
-                      setAddError(
-                        "动作尚未保存，可以重试或取消；不会重复追加。",
-                      );
-                    setBusy(false);
-                  }}
+                  onClick={() => { if (selected) void submitMovement(selected); }}
                 >
-                  加入训练
-                </button>
+                  {addError ? "重试保存动作" : "加入训练"}
+                </button>}
               </>
             }
           >
-            <ExercisePicker
-              saved={data.exercises}
-              value={selected}
-              onChange={setSelected}
-            />
+            {adding === "replace" && original ? (
+              <>
+                <p className="notice">
+                  {original.exercise.name} · 保留已完成 {original.sets.filter((set) => set.status === "completed").length} 组，
+                  替换剩余 {original.sets.filter((set) => set.status === "pending").length} 组。
+                </p>
+                <ReplacementPicker saved={data.exercises} original={original.exercise} alternatives={alternatives}
+                  blocked={busy || !!addError || disabled} onPick={(exercise) => void submitMovement(exercise)} />
+              </>
+            ) : <ExercisePicker saved={data.exercises} value={selected} onChange={setSelected} />}
             {addError && (
               <p role="alert" className="error-text">
                 {addError}
               </p>
             )}
-            <p className="notice">
-              替换只影响本场训练，原模板与历史不会改变。替换会移除当前动作在本场的组记录。
-            </p>
+          </Modal>
+        )}
+      </Presence>
+      <Presence interruptKey={session.id}>
+        {confirmFinish && (
+          <Modal title="结束训练" onClose={() => { if (!busy) setConfirmFinish(false); }}
+            footer={<>
+              <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setConfirmFinish(false)}>继续训练</button>
+              {stats.completedSets > 0 ? (
+                <button type="button" className="btn btn-primary" disabled={!writable || busy} onClick={() => void saveWorkout()}>
+                  {busy ? "正在保存…" : `保存已完成 ${stats.completedSets} 组`}
+                </button>
+              ) : (
+                <button type="button" className="btn btn-danger" disabled={!writable} onClick={() => {
+                  setConfirmFinish(false);
+                  setConfirmCancel(true);
+                }}>放弃草稿</button>
+              )}
+            </>}>
+            <p>已完成 <strong>{stats.completedSets}</strong> 组 · 剩余 <strong>{remaining}</strong> 组</p>
+            {stats.completedSets > 0 && remaining > 0 && <p className="muted">未完成组不会计入训练量。</p>}
+            {finishError && <p role="alert" className="error-text">{finishError}</p>}
           </Modal>
         )}
       </Presence>

@@ -168,7 +168,6 @@ async function legacyWorkout(page: Page) {
   await page.goto('/');
   await ready(page);
   await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-  await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
   await page.getByLabel('杠铃深蹲第1组总重量', { exact: true }).fill('67.5');
   await page.getByLabel('杠铃深蹲第1组次数', { exact: true }).fill('8');
   await page.getByRole('button', { name: '完成杠铃深蹲第1组', exact: true }).click();
@@ -186,7 +185,6 @@ test('模拟iOS桥：迁移真实Web记录后SQLite独立保存、刷新和导�
     await ready(page);
     await expect.poll(() => bridge.data()).toEqual(legacy);
     await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-    await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
     await page.getByLabel('杠铃深蹲第1组总重量', { exact: true }).fill('72.5');
     await expect
       .poll(() => bridge.data().sessions.find((x) => x.status === 'active')?.exercises[0].sets[0].weightKg)

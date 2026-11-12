@@ -12,7 +12,6 @@ async function ready(page: Page) {
 async function begin(page: Page) {
   await ready(page);
   await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-  await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
   await expect(page).toHaveURL(/#\/workout$/);
   await expect(page.getByRole('heading', { name: '全身基础', exact: true, level: 1 })).toBeVisible();
   await expectPersisted(page, (data) => data.sessions.length === 1);
@@ -310,7 +309,6 @@ test('自由训练覆盖次数和时长，已加载页面断网仍可记录归�
     .getByRole('button', { name: '计划', exact: true })
     .click();
   await page.getByRole('button', { name: '直接开始自由训练', exact: true }).click();
-  await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
   await page.getByRole('button', { name: '添加动作', exact: true }).click();
   await selectChoice(page, '选择动作', 'ex-pushup');
   await page.getByRole('button', { name: '加入训练', exact: true }).click();
@@ -322,7 +320,7 @@ test('自由训练覆盖次数和时长，已加载页面断网仍可记录归�
   await expect(repsInput).toBeFocused();
   await repsInput.fill('12');
   await page.getByRole('button', { name: '完成俯卧撑第1组', exact: true }).click();
-  await page.getByRole('button', { name: '添加 / 替换动作', exact: true }).click();
+  await page.getByRole('button', { name: '添加动作', exact: true }).click();
   await selectChoice(page, '选择动作', 'ex-plank');
   await page.getByRole('button', { name: '加入训练', exact: true }).click();
   await page.getByLabel('平板支撑第1组时长', { exact: true }).fill('45');
@@ -447,7 +445,6 @@ for (const width of [320, 390, 768, 1440]) {
       true,
     );
     await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-    await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
     await page.getByLabel('杠铃深蹲第1组总重量', { exact: true }).fill('40');
     await page.getByRole('button', { name: '完成杠铃深蹲第1组', exact: true }).click();
     await expectPersisted(page, (data) => sessionStats(data.sessions[0]).volumeKg === 400);

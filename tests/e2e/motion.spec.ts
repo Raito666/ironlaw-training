@@ -11,7 +11,6 @@ async function ready(page: import('@playwright/test').Page) {
 test('训练进度通过scaleX变化，完成和撤销的数据仍即时保存', async ({ page }) => {
   await ready(page);
   await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-  await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
   expect(
     await page.locator('.progress-fill').evaluate((element) => (element as HTMLElement).style.width),
   ).toBe('');

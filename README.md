@@ -4,9 +4,9 @@
 
 **[立即打开网页版](https://jianlibao-training-raitox.netlify.app/mobile/)** · 手机和电脑均可直接访问。
 
-[下载各平台版本](https://github.com/Raito666/ironlaw-training/releases/tag/v0.4.0-20261110) · [图文使用说明](docs/USAGE.md) · [开发与自托管](docs/DEVELOPMENT.md)
+[下载新版 Web/PWA](https://github.com/Raito666/ironlaw-training/releases/tag/v0.4.0-web.20261112) · [安卓和 iOS 上版下载](https://github.com/Raito666/ironlaw-training/releases/tag/v0.4.0-20261110) · [图文使用说明](docs/USAGE.md) · [开发与自托管](docs/DEVELOPMENT.md)
 
-**本版新增训练排期**。从精选模板一次排好整套训练，按周重复、单场改期或取消。手机与电脑连接同一个加密同步空间后共享排期。 [直达原图完整版](https://jianlibao-training-raitox.netlify.app/mobile/#/plans?preset=photo-complete)
+**新版手机训练流程**。已选计划一键开练，勾组自动计时，换动作保留已完成组，提前结束可直接保存实际完成的组。「今天」优先显示未完成的训练或当日排期。 [直达原图三分化完整版](https://jianlibao-training-raitox.netlify.app/mobile/#/plans?preset=photo-complete)
 
 ![铁律桌面版的训练主页，使用演示数据](docs/screenshots/desktop.png)
 
@@ -14,14 +14,20 @@
 
 | 设备 | 下载项 | 使用方式 |
 | --- | --- | --- |
-| Windows、Mac、浏览器 | Web/PWA ZIP | 解压并启动本地 HTTP 服务。部署到 HTTPS 后可在手机上安装到主屏幕。 |
-| 安卓 | Android APK | Android 7.0 或更新版本。下载 APK 后，用系统安装器打开。当前为原生预览版。 |
-| iPhone / iPad | PWA 或自行签名 | 日常使用可通过 Safari 安装 PWA。Release 提供 iOS 未签名 IPA，可用于开发者自行签名。 |
-| Apple 芯片 Mac | iOS Simulator ZIP | 解压后用 Xcode Simulator 安装 `App.app`。 |
+| Windows、Mac、浏览器 | 新版 Web/PWA ZIP | 解压并启动本地 HTTP 服务。部署到 HTTPS 后可在手机上安装到主屏幕。 |
+| 安卓 | 网页 PWA / 上版 Android APK | 当前新版可用 Chrome 安装到主屏幕。11 月 10 日版 APK 适用于 Android 7.0 或更新版本。 |
+| iPhone / iPad | 网页 PWA / 上版 IPA | 当前新版可用 Safari 添加到主屏幕。11 月 10 日版 IPA 供开发者自行签名。 |
+| Apple 芯片 Mac | 上版 iOS Simulator ZIP | 解压后用 Xcode Simulator 安装 `App.app`。 |
 
-所有下载包来自同一份 Web 资源。首次换设备前，可在原来的「我」页导出备份，再在新设备导入。
+首次换设备前，可在原来的「我」页导出备份，再在新设备导入。新版 Web 支持 v1、v2 和含排期的 v3 备份。
 
-## 看看界面
+## 新版手机训练
+
+| 记组与休息 | 保存结果 |
+| :---: | :---: |
+| <img src="docs/screenshots/training-flow.png" width="250" alt="手机训练，底部常驻休息计时和动作切换"> | <img src="docs/screenshots/training-saved.png" width="250" alt="训练保存结果与补写备注入口"> |
+
+## 其他界面
 
 | 精选模板 | 训练排期 |
 | :---: | :---: |

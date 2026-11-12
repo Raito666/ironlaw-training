@@ -19,28 +19,26 @@ export default function RestPanel({
   nextGroup: string;
 }) {
   return (
-    <section className={`card rest-panel ${collapsed ? 'is-collapsed' : ''}`} aria-label="组间休息">
-      <div className="rest-heading">
-        <div>
-          <h3>组间休息</h3>
-          <div className="rest-time" aria-live="off">
-            {formatClock(rest)}
+    <section className={`card rest-panel ${collapsed ? 'is-collapsed' : ''}`} aria-label="组间休息" data-rest-running={rest > 0}>
+      <div className="rest-bar">
+        <div className="rest-heading">
+          <div>
+            <h3>休息</h3>
+            <div className="rest-time" aria-live="off">
+              {formatClock(rest)}
+            </div>
           </div>
+          <button
+            type="button"
+            className="btn btn-ghost rest-collapse"
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? '展开休息面板' : '收起休息面板'}
+            onClick={() => setCollapsed(!collapsed)}
+          >
+            {collapsed ? '展开' : '收起'}
+          </button>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost rest-collapse"
-          aria-expanded={!collapsed}
-          aria-label={collapsed ? '展开休息面板' : '收起休息面板'}
-          onClick={() => setCollapsed(!collapsed)}
-        >
-          {collapsed ? '展开' : '收起'}
-        </button>
-      </div>
-      <div className="rest-content">
-        <p className="muted">{rest ? '呼吸放缓，准备下一组。' : '按自己的状态开始下一组。'}</p>
-        <p className="rest-next wrap-cjk">下一组：{nextGroup}</p>
-        <div className="row">
+        <div className="row rest-quick-actions">
           <button
             className="btn btn-secondary"
             disabled={disabled}
@@ -51,11 +49,15 @@ export default function RestPanel({
           <button
             className="btn btn-ghost"
             disabled={disabled || !rest}
+            aria-label="跳过休息"
             onClick={() => void update((s) => ({ ...s, restUntil: null }))}
           >
-            跳过休息
+            跳过
           </button>
         </div>
+      </div>
+      <div className="rest-content">
+        <p className="rest-next wrap-cjk">下一组：{nextGroup}</p>
         <details className="rest-options">
           <summary>休息提醒设置</summary>
           <div className="rest-alert-toggles">

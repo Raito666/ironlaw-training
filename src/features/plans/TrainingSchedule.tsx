@@ -71,7 +71,7 @@ export function TrainingDateForm({ template, choices = {}, schedule, whole, edit
   );
 }
 
-const trainingStarted = (entry: TrainingDate, sessions: Session[]) =>
+export const trainingStarted = (entry: TrainingDate, sessions: Session[]) =>
   sessions.some((session) => session.templateId === entry.templateId && session.date === entry.date && session.status !== 'cancelled');
 
 export function TrainingReminder({ entries, sessions, onOpen }: {

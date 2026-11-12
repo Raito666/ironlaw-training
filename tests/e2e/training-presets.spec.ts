@@ -30,9 +30,8 @@ test('参考图三分化加入后可重开和开始训练，旧内置模板不�
   await presets.getByRole('button', { name: '三分化', exact: true }).click();
   await expect(presets.getByRole('button', { name: '已加入我的模板' })).toBeDisabled();
   await presets.getByRole('button', { name: '开始第 1 天' }).click();
-  await expect(page.getByRole('dialog', { name: '三分化 · 胸＋肩中束＋二头' })).toBeVisible();
-  await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
   await expect(page).toHaveURL(/#\/workout$/);
+  await expect(page.getByRole('heading', { name: '三分化 · 胸＋肩中束＋二头', exact: true })).toBeVisible();
   await expectPersisted(page, (data) => data.sessions.some((session) =>
     session.templateId === 'preset-photo-chest' && session.exercises.length === 4));
 });
@@ -44,7 +43,6 @@ test('手机预览可不保存模板直接开练', async ({ page }) => {
   await presets.getByRole('button', { name: '二分化', exact: true }).click();
   const before = await storedWorkspace(page);
   await presets.getByRole('button', { name: '开始第 1 天', exact: true }).click();
-  await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
   await expect(page).toHaveURL(/#\/workout$/);
   await expectPersisted(page, (data) => data.sessions.length === 1 && data.sessions[0].exercises.length > 0);
   expect((await storedWorkspace(page)).templates).toEqual(before.templates);
@@ -65,7 +63,6 @@ test('320px 原图完整版可预览热身、选择替代动作、加入并开�
   await panel.getByRole('button', { name: '加入我的模板' }).click();
   await expectPersisted(page, (data) => data.templates.some((template) => template.id === 'preset-photo-complete-chest' && template.items[2].exerciseId === 'reference-band-chest-press'));
   await panel.getByRole('button', { name: '开始第 1 天' }).click();
-  await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
   await expect(page).toHaveURL(/#\/workout$/);
   await expectPersisted(page, (data) => data.sessions.some((session) => session.templateId === 'preset-photo-complete-chest' &&
     session.exercises.length === 11 && session.exercises[2].sets.every((set) => set.type === 'warmup') &&
@@ -85,7 +82,6 @@ test('二分化可切换循证入门和力量 A／B', async ({ page }) => {
   await panel.getByRole('button', { name: '循证力量 · 全身 A／B', exact: true }).click();
   await panel.getByText('第 2 天 · 力量 B · 硬拉和推举', { exact: true }).click();
   await panel.getByRole('button', { name: '开始第 2 天' }).click();
-  await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
   await expect(page).toHaveURL(/#\/workout$/);
   await expectPersisted(page, (data) => data.sessions.some((session) => session.templateId === 'preset-evidence-strength-b' && session.restDuration === 180));
 });
@@ -119,7 +115,6 @@ test('原图直达、详细说明和手机训练排期可重开、提醒并按�
     expect((await download).suggestedFilename()).toBe('铁律训练.ics');
   }
   await schedule.getByRole('button', { name: '按排期开练' }).click();
-  await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
   await expect(page).toHaveURL(/#\/workout$/);
   await expectPersisted(page, (data) => data.sessions.some((session) => session.templateId === 'preset-photo-complete-chest' &&
     session.exercises[2].exercise.id === 'reference-band-chest-press' && session.exercises[2].sets.every((set) => set.type === 'warmup')));

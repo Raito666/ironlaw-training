@@ -89,7 +89,6 @@ async function bridge(page: Page, initialPermission = 'granted') {
 async function start(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-  await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
 }
 async function options(page: Page) {
   const expand = page.getByRole('button', { name: '展开休息面板', exact: true });

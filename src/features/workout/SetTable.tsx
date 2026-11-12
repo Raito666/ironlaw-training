@@ -18,6 +18,7 @@ export default function SetTable({
   readOnly = false,
   autoRest = true,
   showRpe = false,
+  previousSet,
 }: {
   session: Session;
   exerciseIndex: number;
@@ -27,8 +28,10 @@ export default function SetTable({
   readOnly?: boolean;
   autoRest?: boolean;
   showRpe?: boolean;
+  previousSet?: SetRecord;
 }) {
   const item = session.exercises[exerciseIndex];
+  const nextSet = item.sets.find((set) => set.status === "pending");
   const displayRpe =
     showRpe || (readOnly && item.sets.some((set) => set.rpe !== undefined));
   function change(setId: string, patch: Partial<SetRecord>) {
@@ -107,6 +110,13 @@ export default function SetTable({
                 <td data-label="组">
                   {i + 1}
                   <span className="set-number-label">组</span>
+                  {previousSet && set === nextSet && set.type !== "warmup" && !readOnly && (
+                    <small className="set-previous">
+                      上次 {item.exercise.kind === "duration" ? `${previousSet.durationSeconds} 秒`
+                        : item.exercise.kind === "weight-reps" ? `${displayWeight(previousSet.weightKg, unit)} ${unit} × ${previousSet.reps}`
+                        : `${previousSet.reps} 次`}
+                    </small>
+                  )}
                 </td>
                 <td data-label="类型">
                   <ChoiceSelect

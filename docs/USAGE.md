@@ -1,6 +1,6 @@
 # 铁律使用说明
 
-从 [GitHub Release](https://github.com/Raito666/ironlaw-training/releases/tag/v0.4.0-20261110) 下载对应平台，或直接 [打开固定网页版](https://jianlibao-training-raitox.netlify.app/mobile/)。网页、手机浏览器和原生 App 各自保存本机数据，换设备或换版本前建议先导出备份。
+[打开固定网页版](https://jianlibao-training-raitox.netlify.app/mobile/) · [新版 Web/PWA 下载](https://github.com/Raito666/ironlaw-training/releases/tag/v0.4.0-web.20261112) · [11 月 10 日版安卓与 iOS 下载](https://github.com/Raito666/ironlaw-training/releases/tag/v0.4.0-20261110)。网页、手机浏览器和原生 App 各自保存本机数据，换设备前可先导出备份。
 
 ## 1. 安装或打开
 
@@ -10,13 +10,14 @@
 - **Mac 上的 iOS 模拟器**。Apple 芯片 Mac 安装 Xcode 和 iOS 模拟器，解压 Simulator ZIP，将 `App.app` 拖到已启动的模拟器。命令行可用 `xcrun simctl install booted App.app`。
 - **iPhone 原生开发版**。Release 的 IPA 未签名，需要在自己的开发环境配置签名和设备授权。用 Xcode Personal Team 免费签名时需要定期重新部署。日常可直接用 PWA。 [Apple 官方说明](https://developer.apple.com/help/account/basics/about-your-developer-account/)
 
-## 2. 记一次训练
+## 2. 新版 Web/PWA 如何记一次训练
 
-1. 打开「今天」，点「开始今天的训练」并确认。也可以在「计划」里先建立自己的模板。
-2. 输入重量和次数，点勾完成一组。休息计时可延长或跳过，训练工具里可以查看配片和热身建议。
-3. 完成后进入回顾并点「保存训练」。已有草稿可以从「今天」继续。
+1. 打开「今天」，直接开始当日排期或继续草稿。也可以在「计划」里选好当天模板，点「开始第 X 天」开练。
+2. 核对重量、次数或时长，点勾记录。自动休息时可直接点「+30 秒」或「跳过」。点底部动作计数可打开清单。
+3. 从当前动作点「换动作」，选一个替代。已完成组与备注留在原动作，剩余组转给替代动作。
+4. 点「结束训练」。全部做完直接保存，提前结束时点「保存已完成 X 组」。保存后可以回看记录和补备注。
 
-<img src="screenshots/training.png" width="295" alt="训练记录界面">
+<img src="screenshots/training-flow.png" width="280" alt="手机记组和组间休息"> <img src="screenshots/training-saved.png" width="280" alt="训练保存结果">
 
 ### 安排整套训练
 

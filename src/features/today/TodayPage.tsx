@@ -6,6 +6,7 @@ import type { Page } from '../../app/navigation';
 import Icon from '../../components/Icon';
 import { prefersReducedMotion, subscribeReducedMotion } from '../../motion/reduced-motion';
 import TodayDial, { type DialSegment } from './TodayDial';
+import { presetExerciseById } from '../../content/training-presets';
 
 type Props = {
   data: AppData;
@@ -18,6 +19,8 @@ type Props = {
   writable: boolean;
   go: (page: Page) => void;
   openStart: (template: WorkoutTemplate | 'free') => void;
+  quickStart: (template: WorkoutTemplate | 'free') => void;
+  scheduled?: { template: WorkoutTemplate; entry: { time: string } };
   setTemplateEditor: (template: WorkoutTemplate | 'new') => void;
   onExercise: (exercise: Exercise) => void;
 };
@@ -92,13 +95,15 @@ export default function TodayPage({
   writable,
   go,
   openStart,
+  quickStart,
+  scheduled,
   setTemplateEditor,
   onExercise,
 }: Props) {
   const heroRef = useRef<HTMLElement>(null);
   const dialRef = useRef<HTMLDivElement>(null);
   const ctaRef = useRef<HTMLDivElement>(null);
-  const template = templates[0];
+  const template = scheduled?.template ?? templates[0];
   const activeStats = active ? sessionStats(active) : null;
 
   const planRows: PlanRow[] = active
@@ -115,7 +120,7 @@ export default function TodayPage({
         done: item.sets.filter((set) => set.status === 'completed').length,
       }))
     : (template?.items.flatMap((item) => {
-        const exercise = data.exercises.find((candidate) => candidate.id === item.exerciseId);
+        const exercise = data.exercises.find((candidate) => candidate.id === item.exerciseId) ?? presetExerciseById.get(item.exerciseId);
         if (!exercise) return [];
         return [{
           id: item.id,
@@ -276,7 +281,7 @@ export default function TodayPage({
               <span className="today-live-dot" aria-hidden="true" />
               <span>{dateLabel}</span>
               <span className="today-kicker-sep" aria-hidden="true" />
-              <span>{active ? '训练进行中' : template ? '当前模板' : '自由训练'}</span>
+              <span>{active ? '训练进行中' : scheduled ? `今日排期 · ${scheduled.entry.time}` : template ? '当前模板' : '自由训练'}</span>
             </div>
             <h2>
               {headlineLines.map((line) => (
@@ -296,7 +301,7 @@ export default function TodayPage({
                   className="btn btn-primary today-cta"
                   data-haptic="selection"
                   disabled={!writable}
-                  onClick={() => (active ? go('workout') : openStart(template ?? 'free'))}
+                  onClick={() => (active ? go('workout') : quickStart(template ?? 'free'))}
                 >
                   <span>{active ? '继续未完成训练' : template ? '开始今天的训练' : '开始自由训练'}</span>
                   <span className="today-cta-icon">
@@ -304,6 +309,9 @@ export default function TodayPage({
                   </span>
                 </button>
               </div>
+              {!active && template && (
+                <button className="hero-link today-hero-link" onClick={() => openStart(template)}>预览训练</button>
+              )}
               <button className="hero-link today-hero-link" onClick={() => go('plans')}>
                 查看 / 调整训练模板
                 <span aria-hidden="true">↗</span>

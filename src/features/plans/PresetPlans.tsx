@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Icon from '../../components/Icon';
 import {
   addPresetTemplates,
   divisionLabels,
@@ -168,18 +169,16 @@ export default function PresetPlans({ data, writable, mutate, retry, openStart, 
                 <strong>第 {index + 1} 天 · {info.title}</strong>
                 <span className="muted">{warmups.length > 0 ? `${warmups.length} 热身 · ${work.length} 正式` : `${work.length} 个动作`}</span>
               </summary>
+              {!template?.archived && (
+                <button type="button" className="btn btn-primary preset-start" disabled={!writable || state !== 'idle'} onClick={() => openStart(selected)}>
+                  开始第 {index + 1} 天 <Icon name="arrow" size={16} />
+                </button>
+              )}
               {warmups.length > 0 && <><h4>热身与激活</h4><ol>{warmups.map(renderItem)}</ol><h4>正式动作</h4></>}
               <ol>{work.map(renderItem)}</ol>
               <p className="muted">{info.note}</p>
               {template?.archived && <p className="muted">此训练日已归档，可在下方恢复。</p>}
-              {!template?.archived && (
-                <>
-                  <button type="button" className="btn btn-secondary" disabled={!writable || state !== 'idle'} onClick={() => openStart(selected)}>
-                    开始第 {index + 1} 天
-                  </button>
-                  <TrainingDateForm template={selected} choices={dayChoices} schedule={schedule} />
-                </>
-              )}
+              {!template?.archived && <TrainingDateForm template={selected} choices={dayChoices} schedule={schedule} />}
             </details>
           );
         })}

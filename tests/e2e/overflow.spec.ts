@@ -81,7 +81,7 @@ for (const width of [320, 390]) for (const theme of ['dark', 'light'] as const) 
       await page.getByRole('button', { name: '保存模板', exact: true }).click();
       await expectPersisted(page, d => d.templates.some(t => t.name === templateName && t.description === templateDescription));
       await run.capture('plans-long-template');
-      await page.getByRole('button', { name: `选择 ${templateName}`, exact: true }).click();
+      await page.locator('.template-card').filter({ hasText: templateName }).getByRole('button', { name: '预览', exact: true }).click();
       await run.capture('start-confirmation');
       await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
       await run.text(page.getByLabel('动作备注', { exact: true }), 1000);
@@ -92,7 +92,7 @@ for (const width of [320, 390]) for (const theme of ['dark', 'light'] as const) 
       await page.getByRole('button', { name: '下一动作', exact: true }).click();
       await run.numeric(page.locator('main'), 'workout-duration');
       await page.getByRole('button', { name: '上一动作', exact: true }).click();
-      await page.getByRole('button', { name: '添加 / 替换动作', exact: true }).click();
+      await page.getByRole('button', { name: '添加动作', exact: true }).click();
       await selectChoice(page, '选择动作', exercise.id);
       await run.capture('workout-action-picker');
       await page.getByRole('button', { name: '关闭弹窗', exact: true }).click();

@@ -41,7 +41,6 @@ for (const width of [320, 390, 768, 1440]) for (const theme of ['dark', 'light']
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
     await nav.getByRole('button', { name: '今天', exact: true }).click();
     await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-    await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
     await size(page.locator('.exercise-heading h2'), 26);
     await size(page.getByLabel('杠铃深蹲第1组总重量', { exact: true }), 16);
     if (width <= 390) {

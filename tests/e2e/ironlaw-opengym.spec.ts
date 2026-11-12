@@ -1,6 +1,6 @@
 import { selectChoice } from './choice-helpers';
 import { expect, test, type Page } from '@playwright/test';
-import { expectPersisted, storedWorkspace } from './helpers';
+import { enableStarterTemplate, expectPersisted, storedWorkspace } from './helpers';
 import { readFile } from 'node:fs/promises';
 import { exportTemplate } from '../../src/features/portable-content';
 
@@ -16,8 +16,7 @@ async function failWorkspaceWrite(page: Page) {
 }
 
 async function ready(page: Page) {
-  await page.goto('/');
-  await expect(page.getByRole('button', { name: '开始今天的训练', exact: true })).toBeEnabled();
+  await enableStarterTemplate(page);
 }
 async function nav(page: Page, name: string) {
   await page
@@ -82,8 +81,7 @@ test('扩展动作加入模板、取消不落盘、保存训练快照并刷新�
       data.templates.some((template) => template.name === '扩展目录训练') &&
       data.exercises.some((exercise) => exercise.id === 'og:0001'),
   );
-  await page.getByRole('button', { name: '选择 扩展目录训练', exact: true }).click();
-  await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
+  await page.getByRole('button', { name: '开练 · 扩展目录训练', exact: true }).click();
   await page.getByRole('button', { name: '完成3/4仰卧起坐第1组', exact: true }).click();
   await expectPersisted(page, (data) => data.sessions[0]?.exercises[0]?.sets[0]?.status === 'completed');
   await page.reload();
@@ -97,7 +95,6 @@ test('扩展动作加入模板、取消不落盘、保存训练快照并刷新�
 test('训练工具预览不写数据，显式插入只增加待确认热身组', async ({ page }) => {
   await ready(page);
   await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-  await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
   await page.getByLabel('杠铃深蹲第1组总重量', { exact: true }).fill('80');
   const before = await storedWorkspace(page);
   await page.getByRole('button', { name: '训练辅助', exact: true }).click();
@@ -147,7 +144,6 @@ for (const operation of ['warmups', 'exercise', 'replace', 'import'] as const)
       if (operation === 'import') await nav(page, '计划');
       else {
         await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-        await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
         await expectPersisted(page, (data) => data.sessions.length === 1);
       }
       const before = await storedWorkspace(page);
@@ -156,10 +152,13 @@ for (const operation of ['warmups', 'exercise', 'replace', 'import'] as const)
         await page.getByRole('button', { name: '热身', exact: true }).click();
         await page.getByLabel('正式总重量（kg）', { exact: true }).fill('80');
         await page.getByLabel('空杠 / 起始重量（kg）', { exact: true }).fill('20');
-      } else if (operation === 'exercise' || operation === 'replace') {
-        await page.getByRole('button', { name: '添加 / 替换动作', exact: true }).click();
+      } else if (operation === 'exercise') {
+        await page.getByRole('button', { name: '添加动作', exact: true }).click();
         await page.getByLabel('搜索可选动作', { exact: true }).fill('3/4 sit-up');
         await selectChoice(page, '选择动作', 'og:0001');
+      } else if (operation === 'replace') {
+        await page.getByRole('button', { name: '换动作', exact: true }).click();
+        await page.getByLabel('搜索替代动作', { exact: true }).fill('3/4 sit-up');
       } else {
         await page.getByLabel('导入训练模板文件', { exact: true }).setInputFiles({
           name: 'synthetic-template.json',
@@ -174,7 +173,7 @@ for (const operation of ['warmups', 'exercise', 'replace', 'import'] as const)
             : operation === 'exercise'
               ? '加入训练'
               : operation === 'replace'
-                ? '替换当前动作'
+                ? /^3\/4仰卧起坐\s/
                 : '作为新模板导入',
         exact: true,
       });
@@ -186,7 +185,9 @@ for (const operation of ['warmups', 'exercise', 'replace', 'import'] as const)
       await expect(panel.getByRole('alert')).toContainText('未保存');
       expect(await storedWorkspace(page)).toEqual(before);
       if (outcome === 'retry') {
-        await submit.click();
+        await (operation === 'exercise' || operation === 'replace'
+          ? panel.getByRole('button', { name: '重试保存动作', exact: true })
+          : submit).click();
         await expectPersisted(page, (data) =>
           operation === 'warmups'
             ? data.sessions[0].exercises[0].sets.length === before.sessions[0].exercises[0].sets.length + 3
@@ -286,7 +287,6 @@ for (const width of [320, 390, 768, 1440])
       await selectChoice(page, '当前同步方式', 'netlify');
       await nav(page, '今天');
       await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-      await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
       await expect(page.locator('.workout-view')).toBeVisible();
       await expect(page.getByRole('dialog')).toHaveCount(0);
       await capture('workout');
@@ -296,7 +296,7 @@ for (const width of [320, 390, 768, 1440])
       await page.getByLabel('空杠 / 起始重量（kg）', { exact: true }).fill('20');
       await capture('warmups');
       await page.getByRole('button', { name: '收起训练工具', exact: true }).click();
-      await page.getByRole('button', { name: '添加 / 替换动作', exact: true }).click();
+      await page.getByRole('button', { name: '添加动作', exact: true }).click();
       await page.getByLabel('搜索可选动作', { exact: true }).fill('3/4 sit-up');
       await selectChoice(page, '选择动作', 'og:0001');
       await capture('picker');

@@ -8,6 +8,7 @@ import { storedWorkspace } from './helpers';
 
 function fixture(theme: 'dark' | 'light') {
   const data = createInitialData();
+  data.templates[0].updatedAt = '2026-10-16T00:00:00.000Z';
   data.onboarded = true; data.settings.theme = theme;
   for (let index = 1; index <= 20; index++) {
     const now = Date.parse(`2026-10-${String(index).padStart(2, '0')}T06:00:00Z`);
@@ -30,7 +31,7 @@ function fixture(theme: 'dark' | 'light') {
 async function install(page: Page, data: AppData) {
   await page.clock.setFixedTime(new Date('2026-10-28T06:00:00Z'));
   await page.goto('/');
-  await expect(page.getByRole('button', { name: '开始今天的训练', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '开始自由训练', exact: true })).toBeEnabled();
   await page.evaluate(data => new Promise<void>((resolve, reject) => {
     const request = indexedDB.open('jianlibao', 1);
     request.onsuccess = () => {
@@ -96,7 +97,6 @@ for (const width of [320, 390]) for (const theme of ['dark', 'light'] as const) 
         }
       }
       await page.getByRole('button', { name: '开始今天的训练', exact: true }).tap();
-      await page.getByRole('button', { name: '确认开始训练', exact: true }).tap();
       const weight = page.getByLabel('杠铃深蹲第1组总重量', { exact: true });
       await weight.fill('65'); await keyboard(page, 220);
       await fitsField(weight, 0, 220);
@@ -182,7 +182,6 @@ test('独立浏览器进程关闭并重开后，本地训练和身体数据完�
     const page = context.pages()[0] ?? await context.newPage();
     await install(page, fixture('dark'));
     await page.getByRole('button', { name: '开始今天的训练', exact: true }).tap();
-    await page.getByRole('button', { name: '确认开始训练', exact: true }).tap();
     await page.getByLabel('杠铃深蹲第1组总重量', { exact: true }).fill('80');
     await page.getByLabel('杠铃深蹲第1组次数', { exact: true }).fill('8');
     await page.getByRole('button', { name: '完成杠铃深蹲第1组', exact: true }).tap();

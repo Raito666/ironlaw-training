@@ -42,6 +42,27 @@ export async function expectPersisted(page: Page, check: (data: AppData) => bool
   await expect.poll(async () => check(await storedWorkspace(page))).toBe(true);
 }
 
+/** Tests that require a preconfigured strength routine opt in explicitly. */
+export async function enableStarterTemplate(page: Page): Promise<void> {
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: '开始自由训练', exact: true })).toBeEnabled();
+  const data = await storedWorkspace(page);
+  data.templates[0].updatedAt = '2026-10-16T00:00:00.000Z';
+  await page.evaluate((workspace) => new Promise<void>((resolve, reject) => {
+    const open = indexedDB.open('jianlibao', 1);
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const tx = db.transaction('workspace', 'readwrite');
+      tx.objectStore('workspace').put(workspace, 'main');
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    };
+  }), data);
+  await page.reload();
+  await expect(page.getByRole('button', { name: '开始今天的训练', exact: true })).toBeEnabled();
+}
+
 export function backupFile(data: AppData, name = 'test-backup.json') {
   return {
     name,

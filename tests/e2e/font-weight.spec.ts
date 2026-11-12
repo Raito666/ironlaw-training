@@ -39,7 +39,6 @@ for (const width of [320, 390, 768, 1440]) for (const theme of ['dark', 'light']
     expect(await page.evaluate(() => [...document.querySelectorAll('main *')].filter(el => el.getClientRects().length).every(el => ['400', '600', '700'].includes(getComputedStyle(el).fontWeight)))).toBe(true);
     await nav.getByRole('button', { name: '今天', exact: true }).click();
     await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-    await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
     await weight(page.locator('.exercise-heading h2'), 700);
     await weight(page.getByLabel('杠铃深蹲第1组总重量', { exact: true }), 600);
     await page.getByLabel('杠铃深蹲第1组总重量', { exact: true }).fill('67.5');

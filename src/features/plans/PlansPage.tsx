@@ -26,6 +26,7 @@ type Props = {
   mutate: (fn: (data: AppData) => AppData) => Promise<boolean>;
   retry: () => Promise<boolean>;
   openStart: (template: WorkoutTemplate | 'free') => void;
+  preview: (template: WorkoutTemplate) => void;
   setTemplateEditor: (template: WorkoutTemplate | 'new') => void;
   setArchiveTemplate: (template: WorkoutTemplate) => void;
   setShowArchived: (show: boolean) => void;
@@ -39,6 +40,7 @@ export default function PlansPage({
   mutate,
   retry,
   openStart,
+  preview,
   setTemplateEditor,
   setArchiveTemplate,
   setShowArchived,
@@ -106,10 +108,11 @@ export default function PlansPage({
           ) : (
             <>
               <button className="btn btn-primary" disabled={!writable} onClick={() => openStart(t)}>
-                <span className="truncate">选择 {t.name}</span>
+                <span className="truncate">开练 · {t.name}</span>
                 <Icon name="arrow" size={16} />
               </button>
               <div className="row template-actions">
+                <button className="btn btn-ghost" onClick={() => preview(t)}>预览</button>
                 <button className="btn btn-ghost" onClick={() => void share(t)}>
                   分享模板
                 </button>

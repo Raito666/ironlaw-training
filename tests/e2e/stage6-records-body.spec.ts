@@ -249,7 +249,6 @@ test('新组类型与RPE贯穿训练、刷新、回顾、历史修正，关闭�
   await expectPersisted(page, (d) => d.settings.showRpe);
   await page.goto('/#/today');
   await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-  await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
   for (const [index, type, weight, rpe] of [
     [1, 'drop', '60', '8.5'],
     [2, 'failure', '50', '10'],
@@ -322,7 +321,6 @@ for (const width of [320, 390, 768, 1440])
       await expectPersisted(page, (d) => d.settings.showRpe);
       await page.goto('/#/today');
       await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-      await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
       await selectChoice(page, '杠铃深蹲第1组类型', 'failure');
       await selectChoice(page, '杠铃深蹲第1组RPE', '9.5');
       await expect.poll(() => overflowFindings(page)).toEqual([]);

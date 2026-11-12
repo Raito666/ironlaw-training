@@ -50,7 +50,6 @@ for (const theme of ['dark', 'light']) {
     if (theme === 'light') await page.getByRole('button', { name: '切换主题', exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-    await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
     await page.getByRole('button', { name: '完成杠铃深蹲第1组', exact: true }).click();
     await page.getByRole('button', { name: '提前回顾', exact: true }).click();
     await page.getByRole('button', { name: '保存训练', exact: true }).click();

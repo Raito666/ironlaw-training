@@ -29,6 +29,8 @@ export default function TrainingJournal({
   onRepeat,
   onTrain,
   onExercise,
+  savedSessionId,
+  onDismissSaved,
 }: {
   data: AppData;
   writable: boolean;
@@ -37,6 +39,8 @@ export default function TrainingJournal({
   onRepeat: (s: Session) => void;
   onTrain: () => void;
   onExercise: (ex: Exercise) => void;
+  savedSessionId?: string;
+  onDismissSaved: () => void;
 }) {
   const [manual, setManual] = useState(false);
   const today = dayKey(new Date());
@@ -55,6 +59,7 @@ export default function TrainingJournal({
     return () => media.removeEventListener('change', change);
   }, []);
   const sessions = inPeriod(data.sessions, '1970-01-01', '2100-01-01');
+  const savedSession = sessions.find(({ id }) => id === savedSessionId);
   const lifetime = totals(sessions);
   const trained = [
     ...new Map(
@@ -98,6 +103,31 @@ export default function TrainingJournal({
   }
   return (
     <div className="progress-page">
+      {savedSession && (
+        <section className="card saved-workout" aria-label="本次训练">
+          <div className="section-heading">
+            <div><h2>训练已保存</h2><p className="muted">{savedSession.name} · 完成 {savedSession.exercises.reduce((n, item) => n + item.sets.filter((set) => set.status === 'completed').length, 0)} 组</p></div>
+            <button type="button" className="btn btn-ghost" onClick={onDismissSaved}>收起</button>
+          </div>
+          <button type="button" className="btn btn-secondary" onClick={() => setSelected(savedSession)}>查看本次训练</button>
+          <details>
+            <summary>补写训练备注</summary>
+            <form onSubmit={async (event) => {
+              event.preventDefault();
+              const note = String(new FormData(event.currentTarget).get('note') ?? '');
+              const ok = await mutate((latest) => ({
+                ...latest,
+                sessions: latest.sessions.map((session) => session.id === savedSession.id && session.status === 'completed'
+                  ? { ...session, note, updatedAt: new Date().toISOString() } : session),
+              }));
+              if (ok) notify('训练备注已保存');
+            }}>
+              <label className="field">训练备注<textarea className="form-textarea" name="note" defaultValue={savedSession.note} maxLength={2000} disabled={!writable} /></label>
+              <button type="submit" className="btn btn-primary" disabled={!writable}>保存备注</button>
+            </form>
+          </details>
+        </section>
+      )}
       <div className="progress-masthead">
         <div>
           <p>

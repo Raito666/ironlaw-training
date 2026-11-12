@@ -1,6 +1,6 @@
 import { isWarmupTemplateItem, isWorkSet } from './domain/sets';
-import { ensurePresetExercises, presetExerciseById } from './content/training-presets';
-import { TrainingReminder } from './features/plans/TrainingSchedule';
+import { ensurePresetExercises, presetExerciseById, resolvePresetDay } from './content/training-presets';
+import { TrainingReminder, trainingStarted } from './features/plans/TrainingSchedule';
 import { useTrainingSchedule } from './features/plans/useTrainingSchedule';
 import Presence from './motion/Presence';
 import AppShell from './app/AppShell';
@@ -67,6 +67,9 @@ export default function App() {
   const [exerciseEditor, setExerciseEditor] = useState(false);
   const [exerciseInfo, setExerciseInfo] = useState<Exercise | null>(null);
   const [startTemplate, setStartTemplate] = useState<WorkoutTemplate | 'free' | null>(null);
+  const starting = useRef(false);
+  const [finishing, setFinishing] = useState<Session | null>(null);
+  const [savedSessionId, setSavedSessionId] = useState('');
   const [archiveTemplate, setArchiveTemplate] = useState<WorkoutTemplate | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [confirmReload, setConfirmReload] = useState(false);
@@ -150,11 +153,17 @@ export default function App() {
       </main>
     );
   const active = data.sessions.find(isDraft);
+  const workout = active ?? finishing;
   const completed = data.sessions
     .filter((s) => s.status === 'completed')
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   const templates = data.templates.filter((t) => !t.archived && !isRetiredStarterTemplate(t));
   const date = new Date();
+  const scheduled = schedule.entries.flatMap((entry) => {
+    if (entry.date !== localDate(date) || trainingStarted(entry, data.sessions)) return [];
+    const template = resolvePresetDay(entry.templateId, data.templates.find((t) => t.id === entry.templateId), entry.choices);
+    return template && !template.archived ? [{ entry, template }] : [];
+  })[0];
   const monthSessions = completed.filter((s) => s.date.startsWith(localDate(date).slice(0, 7)));
   const monthlySeconds = monthSessions.reduce((n, s) => n + sessionStats(s).activeSeconds, 0);
   const monthlySets = monthSessions.reduce((n, s) => n + sessionStats(s).completedSets, 0);
@@ -179,28 +188,39 @@ export default function App() {
         sessions: d.sessions.map((s) => (s.id === latest.id ? fn(s, d) : s)),
       };
     });
-  const begin = async () => {
-    if (!startTemplate) return;
+  const begin = async (target: WorkoutTemplate | 'free') => {
+    if (!writable || starting.current) return;
     if (active) {
       setStartTemplate(null);
       go('workout');
       return;
     }
-    const template = startTemplate === 'free' ? null : startTemplate;
-    const ok = await mutate((d) => {
-      if (d.sessions.some(isDraft)) throw new Error('请先继续已有草稿');
-      const next = template ? ensurePresetExercises(d, [template]) : d;
-      const session = createSession(template, next.exercises);
-      if (!template?.items.some(isWarmupTemplateItem)) {
-        session.exercises = session.exercises.map((item) =>
-          seedExercise(item, d.sessions, session.date, session.id),
-        );
-      }
-      if (!template) session.restDuration = d.settings.defaultRest;
-      return { ...next, onboarded: true, sessions: [...next.sessions, session] };
-    });
-    setStartTemplate(null);
-    if (ok) go('workout');
+    starting.current = true;
+    const template = target === 'free' ? null : target;
+    try {
+      const ok = await mutate((d) => {
+        if (d.sessions.some(isDraft)) throw new Error('请先继续已有草稿');
+        const next = template ? ensurePresetExercises(d, [template]) : d;
+        const session = createSession(template, next.exercises);
+        if (!template?.items.some(isWarmupTemplateItem)) {
+          session.exercises = session.exercises.map((item) =>
+            seedExercise(item, d.sessions, session.date, session.id),
+          );
+        }
+        if (!template) session.restDuration = d.settings.defaultRest;
+        return { ...next, onboarded: true, sessions: [...next.sessions, session] };
+      });
+      setStartTemplate(null);
+      if (ok) go('workout');
+      else notify('训练草稿尚未写入，请重试本机保存。');
+    } finally {
+      starting.current = false;
+    }
+  };
+  const quickStart = (target: WorkoutTemplate | 'free') => {
+    if (starting.current) return;
+    if (active) setStartTemplate(target);
+    else void begin(target);
   };
   const exportCurrent = async () => {
     try {
@@ -318,7 +338,7 @@ export default function App() {
                     <button className="btn btn-secondary" onClick={() => setStartTemplate(null)}>
                       暂不开始
                     </button>
-                    <button className="btn btn-primary" disabled={!writable} onClick={() => void begin()}>
+                    <button className="btn btn-primary" disabled={!writable} onClick={() => void begin(startTemplate)}>
                       {active ? '继续已有训练' : '确认开始训练'}
                       <Icon name="arrow" />
                     </button>
@@ -485,6 +505,8 @@ export default function App() {
           writable={writable}
           go={go}
           openStart={openStart}
+          quickStart={quickStart}
+          scheduled={scheduled}
           setTemplateEditor={setTemplateEditor}
           onExercise={setExerciseInfo}
         />
@@ -497,7 +519,8 @@ export default function App() {
           writable={writable}
           mutate={mutate}
           retry={workspace.retry}
-          openStart={openStart}
+          openStart={quickStart}
+          preview={openStart}
           setTemplateEditor={setTemplateEditor}
           setArchiveTemplate={setArchiveTemplate}
           setShowArchived={setShowArchived}
@@ -523,6 +546,8 @@ export default function App() {
           onRepeat={repeatSession}
           onTrain={() => go('plans')}
           onExercise={setExerciseInfo}
+          savedSessionId={savedSessionId}
+          onDismissSaved={() => setSavedSessionId('')}
         />
       )}
       {page === 'settings' && (
@@ -539,31 +564,52 @@ export default function App() {
         />
       )}
       {page === 'workout' &&
-        (active ? (
+        (workout ? (
           <Workout
             restReminder={restReminder}
-            key={`${active.id}-${workspace.loadEpoch}`}
+            key={`${workout.id}-${workspace.loadEpoch}`}
             data={data}
-            session={active}
+            session={workout}
             writable={writable}
             update={updateSession}
-            addExercise={(exercise, replaceId) =>
-              updatePendingSession(
-                (s, current) => addToTraining(s, exercise, current.sessions, replaceId),
+            addExercise={async (exercise, replaceId) => {
+              let insertedId: string | undefined;
+              const ok = await updatePendingSession(
+                (s, current) => {
+                  const next = addToTraining(s, exercise, current.sessions, replaceId);
+                  insertedId = next.exercises.find((item) => !s.exercises.some(({ id }) => id === item.id))?.id;
+                  return next;
+                },
                 [exercise],
-              )
-            }
+              );
+              return ok ? insertedId ?? replaceId ?? null : null;
+            }}
             insertWarmups={(itemId, rows) => updatePendingSession((s) => insertWarmups(s, itemId, rows))}
             cancelPendingAction={() => pendingAction.cancel()}
             hasPendingAction={pendingAction.hasPending()}
             goHome={() => go('today')}
             finish={async () => {
-              const ok = await updateSession((s) => completeSession(s));
-              if (ok) {
-                go('progress');
-                notify('训练已保存到本机，历史与统计已更新');
+              if (!active || finishing || pendingAction.hasPending()) return false;
+              const id = active.id;
+              setFinishing(active);
+              try {
+                if (status === 'error' && workspace.dirty && !(await workspace.retry())) {
+                  notify('本机暂时无法保存，训练仍在草稿中。');
+                  return false;
+                }
+                const ok = await updatePendingSession((s) => completeSession(reviewSession(s)));
+                if (ok) {
+                  setSavedSessionId(id);
+                  go('progress');
+                  notify('训练已保存到本机，历史与统计已更新');
+                } else {
+                  await pendingAction.cancel();
+                  notify('本机暂时无法保存，训练仍在草稿中。');
+                }
+                return ok;
+              } finally {
+                setFinishing(null);
               }
-              return ok;
             }}
             cancel={async () => {
               const ok = await updateSession((s) => {

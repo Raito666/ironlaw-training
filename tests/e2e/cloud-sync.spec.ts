@@ -220,7 +220,6 @@ test('归档训练、动作和模板完整同步，接收设备的草稿和偏�
   try {
     await settings(pa); const key = await create(pa);
     await pa.goto('/'); await pa.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-    await pa.getByRole('button', { name: '确认开始训练', exact: true }).click();
     await pa.getByLabel('杠铃深蹲第1组总重量', { exact: true }).fill('60');
     await pa.getByLabel('杠铃深蹲第1组次数', { exact: true }).fill('10');
     await pa.getByRole('button', { name: '完成杠铃深蹲第1组', exact: true }).click();
@@ -236,7 +235,6 @@ test('归档训练、动作和模板完整同步，接收设备的草稿和偏�
     await expect(pa.getByRole('dialog')).not.toBeVisible(); await sync(pa);
     const original = await storedWorkspace(pa);
     await pb.goto('/'); await pb.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-    await pb.getByRole('button', { name: '确认开始训练', exact: true }).click();
     const beforeJoin = await storedWorkspace(pb), draft = beforeJoin.sessions[0];
     await join(pb, key);
     const received = await storedWorkspace(pb);

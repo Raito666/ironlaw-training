@@ -157,6 +157,19 @@ export function resolvePresetDay(templateId: string, saved: WorkoutTemplate | un
   return { ...saved, items: saved.items.map((item) => ({ ...item, exerciseId: overrides.get(item.id) ?? item.exerciseId })) };
 }
 
+export function presetAlternativeIds(templateId: string | undefined, exerciseId: string): string[] {
+  for (const preset of trainingPresets) {
+    const day = preset.days.find(({ key }) => `preset-${preset.id}-${key}` === templateId);
+    if (!day) continue;
+    for (const [original, alternatives] of Object.entries(day.alternatives ?? {})) {
+      const group = [original, ...alternatives];
+      if (group.includes(exerciseId)) return group.filter((id) => id !== exerciseId);
+    }
+    break;
+  }
+  return [];
+}
+
 export const presetGuides: Record<string, readonly [string, string, string]> = {
   full: ['适合每周练 2 次、想熟悉基本动作的人。', '两次全身训练之间留休息日。先蹲、推、拉，再做硬拉变式与核心。', '先练稳定的幅度和节奏，动作和目标次数都稳定后再小幅加重。'],
   'upper-lower': ['适合每周能安排 3–4 次训练的人。', '上肢与下肢交替。若每周 4 次，可排上、下、休、上、下。', '主项先热身。上肢优先推拉动作，下肢先蹲与髋铰链。'],

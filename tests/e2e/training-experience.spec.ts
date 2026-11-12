@@ -30,7 +30,7 @@ function fixture(exerciseId = 'ex-squat') {
 async function install(page: Page, data: AppData) {
   await page.clock.install({ time: new Date('2026-10-17T06:00:00Z') });
   await page.goto('/');
-  await expect(page.getByRole('button', { name: '开始今天的训练', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '开始自由训练', exact: true })).toBeEnabled();
   await page.evaluate(
     (data) =>
       new Promise<void>((resolve, reject) => {
@@ -54,8 +54,19 @@ async function install(page: Page, data: AppData) {
 }
 async function start(page: Page) {
   await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-  await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
 }
+
+test('练完所有组后从固定结束入口直接归档', async ({ page }) => {
+  const data = fixture();
+  data.templates[0].items[0].sets = 1;
+  await install(page, data);
+  await start(page);
+  await page.getByRole('button', { name: '完成杠铃深蹲第1组', exact: true }).click();
+  await page.getByRole('button', { name: '结束训练', exact: true }).click();
+  await expect(page).toHaveURL(/#\/progress$/);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expectPersisted(page, ({ sessions }) => sessions.length === 2 && sessions[1].status === 'completed');
+});
 
 async function observeAlerts(page: Page) {
   await page.addInitScript(() => {
@@ -292,6 +303,7 @@ test('短视口与非零安全区自动收起休息，输入和固定操作可�
   await install(page, fixture());
   await start(page);
   await page.getByRole('button', { name: '完成杠铃深蹲第1组', exact: true }).click();
+  await page.getByRole('button', { name: '展开休息面板', exact: true }).click();
   await expect(page.getByRole('button', { name: '收起休息面板', exact: true })).toBeVisible();
   await page.addStyleTag({
     content: ':root { --safe-top:24px; --safe-bottom:20px; --safe-left:12px; --safe-right:16px; }',
@@ -321,7 +333,6 @@ test('空自由训练的休息面板避开底部安全区', async ({ page }) => 
     .getByRole('button', { name: '计划', exact: true })
     .click();
   await page.getByRole('button', { name: '直接开始自由训练', exact: true }).click();
-  await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
   await page.addStyleTag({
     content: ':root { --safe-top:24px; --safe-bottom:34px; --safe-left:12px; --safe-right:16px; }',
   });

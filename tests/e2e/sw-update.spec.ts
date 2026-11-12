@@ -67,7 +67,6 @@ test('新 Service Worker 等待安装，活跃训练不刷新且可继续归档'
     });
 
     await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-    await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
     await expect(page).toHaveURL(/#\/workout$/);
     await page.getByLabel('杠铃深蹲第1组总重量', { exact: true }).fill('52.5');
     await expectPersisted(page, data => data.sessions[0].exercises[0].sets[0].weightKg === 52.5);

@@ -206,9 +206,6 @@ for (const width of [320, 390, 768, 1440])
           .getByRole("button", { name: "开始今天的训练", exact: true })
           .click();
         await page
-          .getByRole("button", { name: "确认开始训练", exact: true })
-          .click();
-        await page
           .getByLabel("杠铃深蹲第1组总重量", { exact: true })
           .fill("52.5");
         await expectPersisted(

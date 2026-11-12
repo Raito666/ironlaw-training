@@ -16,6 +16,8 @@ export default defineConfig({
     '**/ios-cloud-sync.spec.ts',
     '**/web.spec.ts',
     '**/training-experience.spec.ts',
+    '**/training-flow.spec.ts',
+    '**/training-presets.spec.ts',
     '**/stage6-records-body.spec.ts',
     '**/stage7-information-architecture.spec.ts',
     '**/history-calendar.spec.ts',

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { enableStarterTemplate } from './helpers';
 
 async function keyboardViewport(page: Page) {
   await page.addInitScript(() => {
@@ -36,8 +37,7 @@ for (const width of [320, 390]) for (const theme of ['dark', 'light'] as const) 
     test.use({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true, colorScheme: theme });
     test.beforeEach(async ({ page }) => {
       await keyboardViewport(page);
-      await page.goto('/');
-      await expect(page.getByRole('button', { name: '开始今天的训练', exact: true })).toBeEnabled();
+      await enableStarterTemplate(page);
       if (await page.locator('html').getAttribute('data-theme') !== theme) await page.getByRole('button', { name: '切换主题', exact: true }).click();
     });
 
@@ -72,7 +72,6 @@ for (const width of [320, 390]) for (const theme of ['dark', 'light'] as const) 
 
     test('训练数值输入避开键盘与固定操作，切换字段保持输入且不自动完成', async ({ page }) => {
       await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
-      await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
       const weight = page.getByLabel('杠铃深蹲第1组总重量', { exact: true });
       await weight.fill('65');
       await resizeKeyboard(page, 340);
