@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { expectPersisted, storedWorkspace } from './helpers';
+import { enableStarterTemplate, expectPersisted, storedWorkspace } from './helpers';
 
 test.use({ viewport: { width: 320, height: 568 }, hasTouch: true });
 
@@ -90,4 +90,70 @@ test('今天展示排期，保留排期的替代动作并直接开始', async ({
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expectPersisted(page, ({ sessions }) => sessions.length === 1 &&
     sessions[0].exercises.some((item) => item.exercise.name === '弹力带平推' && item.sets.every(({ type }) => type === 'warmup')));
+});
+
+test('补练只结清选中的场次，今天的同模板排期仍可开练', async ({ page }, info) => {
+  await page.clock.setFixedTime(new Date('2026-11-12T08:00:00Z'));
+  await enableStarterTemplate(page);
+  const data = await storedWorkspace(page);
+  const original = data.templates[0];
+  original.items = [{ ...original.items[0], sets: 1 }];
+  const second = { ...original, id: 'test-evening-template', name: '手臂训练' };
+  data.templates = [original, second];
+  data.schemaVersion = 3;
+  data.trainingSchedule = [
+    { id: 'test-missed', templateId: original.id, date: '2026-11-11', time: '19:00', choices: {}, lead: 15 },
+    { id: 'test-today', templateId: original.id, date: '2026-11-12', time: '18:00', choices: {}, lead: 15 },
+    { id: 'test-evening', templateId: second.id, date: '2026-11-12', time: '20:00', choices: {}, lead: 15 },
+  ];
+  await page.evaluate((workspace) => new Promise<void>((resolve, reject) => {
+    const open = indexedDB.open('jianlibao', 1);
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const tx = db.transaction('workspace', 'readwrite');
+      tx.objectStore('workspace').put(workspace, 'main');
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    };
+  }), data);
+  await page.reload();
+  const upcoming = page.getByRole('region', { name: '训练安排' });
+  await expect(upcoming).toContainText('20:00');
+  await upcoming.getByRole('button', { name: '补练', exact: true }).tap();
+  await expect(page).toHaveURL(/#\/workout$/);
+  await expectPersisted(page, (latest) => latest.sessions[0]?.scheduleId === 'test-missed');
+  await page.reload();
+  await page.getByRole('button', { name: '完成杠铃深蹲第1组', exact: true }).tap();
+  await page.getByRole('button', { name: '结束训练', exact: true }).tap();
+  await expect(page).toHaveURL(/#\/progress$/);
+  const result = page.getByRole('region', { name: '本次训练' });
+  await expect(result).toContainText('18:00');
+  await result.getByRole('button', { name: '查看排期', exact: true }).tap();
+  const schedule = page.getByRole('region', { name: '训练排期', exact: true });
+  await expect(schedule.getByText('2026-11-11 · 19:00 · 已补练')).toBeInViewport();
+  await expect(schedule.getByRole('button', { name: '补练', exact: true })).toHaveCount(0);
+  await expect(schedule.getByText('2026-11-12 · 18:00 · 提前 15 分钟提醒')).toBeVisible();
+  await page.screenshot({ path: info.outputPath('320-missed-session-completed.png'), animations: 'disabled' });
+  await expectPersisted(page, (latest) => latest.schemaVersion === 4 && latest.sessions.length === 1 &&
+    latest.sessions[0].status === 'completed' && latest.sessions[0].date === '2026-11-12' && latest.sessions[0].scheduleId === 'test-missed');
+  expect((await storedWorkspace(page)).trainingSchedule).toEqual(data.trainingSchedule);
+  const previous = await page.evaluate(() => new Promise<unknown>((resolve, reject) => {
+    const open = indexedDB.open('jianlibao', 1);
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const tx = db.transaction('workspace', 'readonly');
+      const get = tx.objectStore('workspace').get('pre-schema-v4');
+      tx.oncomplete = () => { db.close(); resolve(get.result); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    };
+  }));
+  expect(previous).toEqual(data);
+  await schedule.getByRole('button', { name: '查看训练记录', exact: true }).tap();
+  await expect(page.getByRole('dialog')).toContainText('杠铃深蹲');
+  await page.goto('/mobile/#/plans?schedule=1');
+  const next = schedule.getByRole('listitem').filter({ hasText: '2026-11-12 · 18:00' });
+  await next.getByRole('button', { name: '按排期开练', exact: true }).tap();
+  await expectPersisted(page, (latest) => latest.sessions.length === 2 && latest.sessions[1].scheduleId === 'test-today');
 });

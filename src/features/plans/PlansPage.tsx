@@ -1,8 +1,8 @@
-import type { AppData, WorkoutTemplate } from '../../domain/types';
+import type { AppData, Session, TrainingDate, WorkoutTemplate } from '../../domain/types';
 import { uid } from '../../domain/training';
 import { isRetiredStarterTemplate } from '../../domain/seed';
 import Icon from '../../components/Icon';
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useListMotion } from '../../motion/presentation';
 import Modal from '../../components/Modal';
 import { exportTextFile } from '../../platform/native';
@@ -25,12 +25,14 @@ type Props = {
   writable: boolean;
   mutate: (fn: (data: AppData) => AppData) => Promise<boolean>;
   retry: () => Promise<boolean>;
-  openStart: (template: WorkoutTemplate | 'free') => void;
+  openStart: (template: WorkoutTemplate | 'free', scheduleId?: string) => void;
   preview: (template: WorkoutTemplate) => void;
   setTemplateEditor: (template: WorkoutTemplate | 'new') => void;
   setArchiveTemplate: (template: WorkoutTemplate) => void;
   setShowArchived: (show: boolean) => void;
   schedule: TrainingScheduleController;
+  findScheduledSession: (entry: TrainingDate) => Session | undefined;
+  onScheduledHistory: (session: Session) => void;
 };
 export default function PlansPage({
   data,
@@ -45,6 +47,8 @@ export default function PlansPage({
   setArchiveTemplate,
   setShowArchived,
   schedule,
+  findScheduledSession,
+  onScheduledHistory,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
@@ -52,6 +56,11 @@ export default function PlansPage({
   const [fileError, setFileError] = useState('');
   const [busy, setBusy] = useState(false);
   const pendingImport = usePendingMutation(mutate, retry);
+  useLayoutEffect(() => {
+    if (new URLSearchParams(location.hash.split('?')[1]).has('schedule')) {
+      document.getElementById('training-schedule')?.scrollIntoView({ block: 'start' });
+    }
+  }, []);
   const closeImport = () => {
     if (!busy)
       void pendingImport.cancel().then((ok) => {
@@ -168,7 +177,7 @@ export default function PlansPage({
         </button>
       )}
       <PresetPlans data={data} writable={writable} mutate={mutate} retry={retry} openStart={openStart} schedule={schedule} />
-      <TrainingSchedulePanel schedule={schedule} sessions={data.sessions} writable={writable} openStart={openStart}
+      <TrainingSchedulePanel schedule={schedule} findSession={findScheduledSession} writable={writable} openStart={openStart} onView={onScheduledHistory}
         resolveTemplate={(entry) => resolvePresetDay(entry.templateId, data.templates.find((template) => template.id === entry.templateId), entry.choices)} />
       <div className="section-heading">
         <div>

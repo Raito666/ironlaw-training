@@ -8,6 +8,7 @@
 
 ```sh
 pnpm install --frozen-lockfile
+npm --prefix server/opengym/api ci
 pnpm dev
 pnpm test
 pnpm build
@@ -28,6 +29,8 @@ bash scripts/package-android.sh
 ```
 
 两条原生构建命令按所需平台分别执行。iOS 需要 Apple 芯片 Mac 和 Xcode 26，生成无签名模拟器 ZIP 与设备 IPA。真机安装用自己的 Apple 开发团队签名。Android 需要 JDK 21、Android SDK 36 与 Build Tools 36.0.0。脚本生成已对齐的未签名 APK，公开安装包在发布阶段使用维护者持有的签名生成。
+
+模拟器构建使用当前应用专用的 Keychain 标识验证云同步。设备 IPA 使用安装者自己的开发团队签名。
 
 若要直接打开工程调试，可执行 `pnpm exec cap sync ios` 或 `pnpm exec cap sync android`，再从 Xcode 或 Android Studio 运行。
 

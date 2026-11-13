@@ -1,6 +1,6 @@
 import { openChoice, selectChoice } from './choice-helpers';
 import { expect, test } from '@playwright/test';
-import { backupFile, expectPersisted, storedWorkspace } from './helpers';
+import { backupFile, enableStarterTemplate, expectPersisted, storedWorkspace } from './helpers';
 import { longText, nav, OverflowRun, overflowFindings, overflowRuns } from './overflow-helpers';
 
 test.afterEach(async ({}, info) => { await overflowRuns.get(info)?.report(); });
@@ -27,8 +27,7 @@ for (const width of [320, 390]) for (const theme of ['dark', 'light'] as const) 
     test.use({ viewport: { width, height: 844 }, actionTimeout: 10_000 });
     test.beforeEach(async ({ page }) => {
       await page.clock.setFixedTime(new Date('2026-10-16T06:00:00Z'));
-      await page.goto('/');
-      await expect(page.getByRole('button', { name: '开始今天的训练', exact: true })).toBeEnabled();
+      await enableStarterTemplate(page);
       if (theme === 'light') await page.getByRole('button', { name: '切换主题', exact: true }).click();
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     });
@@ -86,6 +85,7 @@ for (const width of [320, 390]) for (const theme of ['dark', 'light'] as const) 
       await page.getByRole('button', { name: '确认开始训练', exact: true }).click();
       await run.text(page.getByLabel('动作备注', { exact: true }), 1000);
       await run.numeric(page.locator('main'), 'workout');
+      await page.locator('.workout-set-options > summary').click();
       await selectChoice(page, `${name}第1组类型`, 'warmup');
       await selectChoice(page, `${name}第1组类型`, 'work');
       await run.capture('workout-long-action-note');
@@ -93,6 +93,7 @@ for (const width of [320, 390]) for (const theme of ['dark', 'light'] as const) 
       await run.numeric(page.locator('main'), 'workout-duration');
       await page.getByRole('button', { name: '上一动作', exact: true }).click();
       await page.getByRole('button', { name: '添加动作', exact: true }).click();
+      await page.getByRole('dialog').getByRole('searchbox', { name: '搜索可选动作', exact: true }).fill(name);
       await selectChoice(page, '选择动作', exercise.id);
       await run.capture('workout-action-picker');
       await page.getByRole('button', { name: '关闭弹窗', exact: true }).click();

@@ -20,6 +20,7 @@ function transaction(db: IDBDatabase, update?: { data: AppData; expectedRevision
           if (migrating) throw new StoreConflictError(); // A stale v1 writer must reload the upgraded workspace.
           if (current.revision >= Number.MAX_SAFE_INTEGER - 1) throw new Error('本地数据版本已达上限，请先导出备份');
           if (current.schemaVersion === 2 && update.data.schemaVersion === 3) tx.objectStore('workspace').put(request.result, 'pre-schema-v3');
+          if (request.result && current.schemaVersion < 4 && update.data.schemaVersion === 4) tx.objectStore('workspace').put(request.result, 'pre-schema-v4');
           result = { ...update.data, revision: current.revision + 1 };
           tx.objectStore('workspace').put(result, 'main');
         } else {

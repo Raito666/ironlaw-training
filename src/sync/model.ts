@@ -1,10 +1,10 @@
 import type { AppData } from '../domain/types';
 import { validateAppData, validateSharedCollections } from '../data/backup';
 import { validateTrainingSchedule } from '../data/backup';
-import { withTrainingSchedule } from '../data/migrations';
+import { withScheduleLinks, withTrainingSchedule } from '../data/migrations';
 
 const collections = ['exercises', 'templates', 'sessions', 'bodyMetrics', 'trainingSchedule'] as const;
-export type Snapshot = Pick<AppData, typeof collections[number]> & { version: 1 | 2; tombstones: string[] };
+export type Snapshot = Pick<AppData, typeof collections[number]> & { version: 1 | 2 | 3; tombstones: string[] };
 export type Resolution = Record<string, 'local' | 'remote'>;
 export interface SyncConflict { key: string; name: string; local: unknown; remote: unknown }
 export function canonical(value: unknown): string {
@@ -16,18 +16,19 @@ export function emptySnapshot(): Snapshot { return { version: 1, exercises: [], 
 export function validateSnapshot(value: unknown): Snapshot {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('云同步数据格式无效');
   const { version, tombstones = [], trainingSchedule, ...rest } = value as Record<string, unknown>;
-  if (version !== 1 && version !== 2) throw new Error('不支持的云同步数据版本，请更新应用');
+  if (version !== 1 && version !== 2 && version !== 3) throw new Error('不支持的云同步数据版本，请更新应用');
   if (version === 1 && (Object.hasOwn(value, 'trainingSchedule') || (Array.isArray(tombstones) && tombstones.some((key) => typeof key === 'string' && key.startsWith('trainingSchedule:'))))) throw new Error('云端排期版本无效');
   if (!Array.isArray(tombstones) || tombstones.length > 100000 || tombstones.some(k => typeof k !== 'string' || !/^(?:(?:exercises|templates|sessions|trainingSchedule):[A-Za-z0-9][A-Za-z0-9._:-]{0,119}|bodyMetrics:\d{4}-\d{2}-\d{2})$/.test(k)) || new Set(tombstones).size !== tombstones.length) throw new Error('云端删除标记无效');
-  const parsed: Snapshot = { version, ...validateSharedCollections(rest), tombstones: [...tombstones].sort() };
-  if (version === 2) parsed.trainingSchedule = trainingSchedule === undefined ? [] : validateTrainingSchedule(trainingSchedule);
+  const parsed: Snapshot = { version, ...validateSharedCollections(rest, version === 3), tombstones: [...tombstones].sort() };
+  if (version >= 2) parsed.trainingSchedule = trainingSchedule === undefined ? [] : validateTrainingSchedule(trainingSchedule);
   const erased = new Set(tombstones);
   if (collections.some(c => parsed[c]?.some(item => erased.has(`${c}:${keyOf(c, item)}`)))) throw new Error('云端记录同时标记为保留和删除，请核对同步文档');
   return parsed;
 }
 export function snapshotOf(data: AppData): Snapshot {
-  return { version: data.trainingSchedule ? 2 : 1, ...(data.trainingSchedule ? { trainingSchedule: data.trainingSchedule } : {}), tombstones: [], exercises: data.exercises, templates: data.templates, bodyMetrics: data.bodyMetrics,
-    sessions: data.sessions.filter(s => s.status === 'completed' || s.status === 'cancelled') };
+  const sessions = data.sessions.filter(s => s.status === 'completed' || s.status === 'cancelled');
+  const version = sessions.some((session) => session.scheduleId) ? 3 : data.trainingSchedule ? 2 : 1;
+  return { version, ...(data.trainingSchedule ? { trainingSchedule: data.trainingSchedule } : {}), tombstones: [], exercises: data.exercises, templates: data.templates, bodyMetrics: data.bodyMetrics, sessions };
 }
 export function sameSnapshot(a: Snapshot, b: Snapshot): boolean {
   return collections.every(c => canonical([...(a[c] ?? [])].sort((x, y) => keyOf(c, x).localeCompare(keyOf(c, y)))) === canonical([...(b[c] ?? [])].sort((x, y) => keyOf(c, x).localeCompare(keyOf(c, y)))));
@@ -40,8 +41,9 @@ function keyOf(collection: typeof collections[number], item: { id: string; date?
 }
 export function mergeSnapshots(base: Snapshot, local: Snapshot, remote: Snapshot, resolutions: Resolution = {}) {
   const snapshot = emptySnapshot(), conflicts: SyncConflict[] = [];
-  if ([base, local, remote].some((document) => document.version === 2)) {
-    snapshot.version = 2;
+  const versions = [base.version, local.version, remote.version];
+  if (versions.some((version) => version >= 2)) {
+    snapshot.version = versions.includes(3) ? 3 : 2;
     snapshot.trainingSchedule = [];
   }
   const deleted = Symbol('deleted');
@@ -78,5 +80,6 @@ export function applySnapshot(local: AppData, snapshot: Snapshot): AppData {
   const { version, tombstones: _tombstones, trainingSchedule, ...shared } = validateSnapshot(snapshot), drafts = local.sessions.filter(s => !['completed', 'cancelled'].includes(s.status));
   if (drafts.some(d => shared.sessions.some(s => s.id === d.id))) throw new Error('云端已有同一场训练的归档记录。请先处理本机进行中的训练，再同步。');
   const merged = { ...local, ...shared, sessions: [...shared.sessions, ...drafts] };
-  return validateAppData(version === 2 || local.schemaVersion === 3 ? withTrainingSchedule(merged, trainingSchedule ?? []) : merged);
+  const scheduled = version >= 2 || local.schemaVersion >= 3 ? withTrainingSchedule(merged, trainingSchedule ?? []) : merged;
+  return validateAppData(version === 3 ? withScheduleLinks(scheduled) : scheduled);
 }

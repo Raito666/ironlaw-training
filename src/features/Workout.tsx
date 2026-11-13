@@ -1,4 +1,4 @@
-import { isCompactViewport } from "../platform/compact-layout";
+import { COMPACT_LAYOUT_QUERY, isCompactViewport } from "../platform/compact-layout";
 import { muscleLabel } from "../content/body-map";
 import Presence from "../motion/Presence";
 import RestPanel from "./workout/RestPanel";
@@ -10,7 +10,7 @@ import type { Update } from "./workout/types";
 export { default as SetTable } from "./workout/SetTable";
 export { default as Summary } from "./workout/Summary";
 export { formatClock, useNow } from "./workout/clock";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { AppData, Exercise, Session } from "../domain/types";
 import {
   pauseSession,
@@ -22,8 +22,7 @@ import {
 import Icon from "../components/Icon";
 import Modal from "../components/Modal";
 import ExerciseDetails from "./ExerciseDetails";
-import { displayWeight } from "../domain/units";
-import { lastWorkSet, nextSuggestedSet } from "./workout/performance";
+import { exerciseSetHistory, nextSuggestedSet } from "./workout/performance";
 import ExercisePicker from "../components/ExercisePicker";
 import ReplacementPicker from "./workout/ReplacementPicker";
 import { presetAlternativeIds, presetExerciseById } from "../content/training-presets";
@@ -38,6 +37,7 @@ export default function Workout({
   finish,
   cancel,
   writable,
+  online,
   goHome,
   restReminder,
   addExercise,
@@ -51,6 +51,7 @@ export default function Workout({
   finish: () => Promise<boolean>;
   cancel: () => Promise<boolean>;
   writable: boolean;
+  online: boolean;
   goHome: () => void;
   restReminder: ReturnType<typeof useRestReminder>;
   addExercise: (exercise: Exercise, replaceId?: string) => Promise<string | null>;
@@ -64,15 +65,25 @@ export default function Workout({
   const now = useNow();
   const positionKey = "jianlibao.training-position";
   const [position, setPosition] = useState(() => {
-    const initial = session.exercises.find((item) => item.sets.some((set) => set.status === "pending")) ?? session.exercises[0];
+    const initial = session.exercises.find((item) => item.sets.some((set) => set.status === "pending"));
     try {
       const stored = localStorage.getItem(positionKey);
       const id = stored?.startsWith(`${session.id}/`) ? stored.slice(session.id.length + 1) : undefined;
-      return session.exercises.find((item) => item.id === id)?.id ?? initial?.id ?? "";
+      const selected = session.exercises.find((item) => item.id === id);
+      const hasPending = selected?.sets.some((set) => set.status === "pending");
+      return (hasPending ? selected : initial ?? selected ?? session.exercises[0])?.id ?? "";
     } catch {
-      return initial?.id ?? "";
+      return (initial ?? session.exercises[0])?.id ?? "";
     }
   });
+  const [compact, setCompact] = useState(isCompactViewport);
+  const [chosenSetId, setChosenSetId] = useState<string>();
+  useEffect(() => {
+    const media = window.matchMedia(COMPACT_LAYOUT_QUERY);
+    const change = () => setCompact(media.matches);
+    media.addEventListener('change', change);
+    return () => media.removeEventListener('change', change);
+  }, []);
   const [queueOpen, setQueueOpen] = useState(false);
   const queueOrigin = useRef(0);
   const [confirmFinish, setConfirmFinish] = useState(false);
@@ -121,6 +132,7 @@ export default function Workout({
   const current = index < 0 ? Math.max(0, session.exercises.findIndex((ex) => ex.sets.some((set) => set.status === "pending"))) : index;
   const item = session.exercises[current];
   const selectItem = (id: string) => {
+    setChosenSetId(undefined);
     setPosition(id);
     try {
       localStorage.setItem(positionKey, `${session.id}/${id}`);
@@ -131,9 +143,9 @@ export default function Workout({
   const setCurrent = (next: number) => {
     if (session.exercises[next]) selectItem(session.exercises[next].id);
   };
-  const previousSet = item
-    ? lastWorkSet(data.sessions, item.exercise, session.date, session.id)
-    : undefined;
+  const exercise = item?.exercise;
+  const setHistory = useMemo(() => exercise ? exerciseSetHistory(data.sessions, exercise, session.date, session.id) : [],
+    [data.sessions, exercise, session.date, session.id]);
   useLayoutEffect(() => {
     const root = view.current;
     if (!root) return;
@@ -182,11 +194,15 @@ export default function Workout({
         .closest<HTMLElement>(".app-shell")
         ?.style.removeProperty("--training-dock-height");
     };
-  }, [session.status, item?.id]);
+  }, [session.status, item?.id, compact]);
   useLayoutEffect(() => {
     view.current?.scrollTo({ top: 0, behavior: "instant" });
   }, [item?.id, session.status === "review"]);
   const pending = item?.sets.findIndex((set) => set.status === "pending") ?? -1;
+  const focused = item?.sets.findIndex((set) => set.id === chosenSetId && set.status === 'pending') ?? -1;
+  const entryIndex = compact && focused >= 0 ? focused : pending;
+  const nextPendingMove = session.exercises.findIndex((move, index) => index > current && move.sets.some((set) => set.status === 'pending'));
+  const pendingMove = nextPendingMove >= 0 ? nextPendingMove : session.exercises.findIndex((move) => move.sets.some((set) => set.status === 'pending'));
   const openPicker = (mode: "add" | "replace") => {
     replacing.current = mode === "replace" ? item : null;
     setSelected(null);
@@ -232,9 +248,32 @@ export default function Workout({
     if (remaining || !stats.completedSets) setConfirmFinish(true);
     else void saveWorkout();
   };
-  const nextGroup = item
-    ? `${item.exercise.name} · ${pending >= 0 ? `第${pending + 1}组` : "当前动作已记录完毕"}`
-    : "先加入一个动作";
+  function renderFooter(record?: ReactNode) {
+    const following = current < session.exercises.length - 1 ? current + 1 : -1;
+    const next = compact && !record ? pendingMove : following;
+    const nextLabel = next < 0 ? '完成本次训练' : next < current ? '回到待练动作' : '下一动作';
+    return <div className="workout-footer">
+      <button className="btn btn-secondary" disabled={!current} onClick={() => setCurrent(current - 1)} aria-label="上一动作">
+        <Icon name="back" size={16} />
+        <span className="workout-previous-label">上一动作</span>
+      </button>
+      <button type="button" className="btn btn-secondary workout-queue-mobile" aria-controls="workout-queue"
+        aria-expanded={queueOpen} aria-label={`动作 ${current + 1}/${session.exercises.length}`} onClick={toggleQueue}>
+        {current + 1}/{session.exercises.length} <span>动作</span>
+      </button>
+      {record}
+      {(!record || next >= 0) && <button className={`btn ${record ? 'btn-secondary workout-next' : 'btn-primary'}`}
+        aria-label={nextLabel} onClick={() => next >= 0 ? setCurrent(next) : endWorkout()}
+        disabled={!writable || session.status === "paused" || busy}>
+        {!record && nextLabel}
+        <Icon name="arrow" size={16} />
+      </button>}
+    </div>;
+  }
+  const waitingMove = entryIndex >= 0 ? item : session.exercises[pendingMove];
+  const waitingIndex = entryIndex >= 0 ? entryIndex : waitingMove?.sets.findIndex((set) => set.status === 'pending');
+  const nextGroup = waitingMove && waitingIndex !== undefined ? `${waitingMove.exercise.name} · 第${waitingIndex + 1}组`
+    : item ? '本次训练各组已处理' : '先加入一个动作';
   const original = replacing.current;
   const alternatives = original && adding === "replace"
     ? presetAlternativeIds(session.templateId, original.exercise.id).flatMap((id) => {
@@ -246,7 +285,7 @@ export default function Workout({
     void update((s) => ({ ...s, note, updatedAt: new Date().toISOString() }));
   return (
     <div
-      className="workout-view"
+      className={`workout-view${compact && item && session.status !== 'review' ? ' workout-focus' : ''}`}
       data-ios-input-scope=""
       ref={view}
       onFocusCapture={(event) => {
@@ -269,12 +308,14 @@ export default function Workout({
               : session.name}
           </h1>
           <p className="muted">
-            {session.date} ·{" "}
+            <span className="workout-session-date">{session.date} · </span>
             {session.status === "paused"
               ? "已暂停"
               : session.status === "review"
                 ? "待归档"
-                : "训练中"}{" "}
+                : compact && !online
+                  ? <span title="当前离线，记录继续保存在本机">离线</span>
+                  : "训练中"}{" "}
             · {formatClock(stats.activeSeconds)}
           </p>
         </div>
@@ -284,7 +325,7 @@ export default function Workout({
             <span className="workout-return-label">返回今天</span>
           </button>
           {session.status !== "review" && (
-            <button className="btn btn-primary workout-end" onClick={endWorkout} disabled={!writable || busy || hasPendingAction}>
+            <button className={`btn ${compact && item ? 'btn-secondary' : 'btn-primary'} workout-end`} onClick={endWorkout} disabled={!writable || busy || hasPendingAction}>
               结束训练
             </button>
           )}
@@ -305,7 +346,7 @@ export default function Workout({
         />
       ) : (
         <>
-          <div className="section-heading">
+          <div className="section-heading workout-progress">
             <div className="workout-progress-copy">
               {item && <button type="button" className="btn btn-secondary workout-queue-toggle" aria-controls="workout-queue" aria-expanded={queueOpen}
                 onClick={toggleQueue}>
@@ -330,6 +371,7 @@ export default function Workout({
             aria-valuenow={stats.completedSets}
             aria-valuemin={0}
             aria-valuemax={count || 1}
+            aria-valuetext={`已完成 ${stats.completedSets} / ${count} 组`}
           >
             <div
               className="progress-fill"
@@ -373,40 +415,29 @@ export default function Workout({
                       >
                         {item.exercise.name}
                       </h2>
-                      <p className="muted">
-                        {item.exercise.equipment} ·{" "}
-                        {item.exercise.kind === "weight-reps"
-                          ? "总外部负重；双哑铃两只合计"
+                      <p className="muted workout-exercise-meta">
+                        {item.exercise.equipment}
+                        {!compact && (item.exercise.kind === "weight-reps"
+                          ? " · 总外部负重；双哑铃两只合计"
                           : item.exercise.kind === "duration"
-                            ? "按实际秒数记录"
-                            : "按次数记录，不估算有效负重"}
+                            ? " · 按实际秒数记录"
+                            : " · 按次数记录，不估算有效负重")}
                       </p>
                     </div>
                     <div className="workout-exercise-actions"><button
                       className="btn btn-ghost"
+                      aria-label="动作说明 ↗"
                       onClick={() => setDetail(item.exercise)}
                     >
-                      动作说明 ↗
+                      {compact ? '讲解' : '动作说明 ↗'}
                     </button>
                     {pending >= 0 && <button type="button" className="btn btn-secondary"
                       disabled={disabled || busy || (session.exercises.length >= 30 && (!!item.note || item.sets.some((set) => set.status !== "pending")))}
                       onClick={() => openPicker("replace")}>换动作</button>}
                     </div>
                   </div>
-                  {previousSet && (
-                    <div className="previous-result">
-                      <Icon name="history" />
-                      <span>
-                        上次完成：
-                        {item.exercise.kind === "weight-reps"
-                          ? `${displayWeight(previousSet.weightKg, data.settings.unit)} ${data.settings.unit} × ${previousSet.reps} 次`
-                          : item.exercise.kind === "duration"
-                            ? `${previousSet.durationSeconds} 秒`
-                            : `${previousSet.reps} 次`}
-                      </span>
-                    </div>
-                  )}
                   <SetTable
+                    key={item.id}
                     session={session}
                     exerciseIndex={current}
                     unit={data.settings.unit}
@@ -414,11 +445,17 @@ export default function Workout({
                     disabled={disabled}
                     autoRest={data.settings.autoRest}
                     showRpe={data.settings.showRpe}
-                    previousSet={previousSet}
+                    history={setHistory}
+                    compact={compact ? {
+                      focusedSetId: item.sets[entryIndex]?.id,
+                      select: (id) => {
+                        setChosenSetId(id);
+                        view.current?.scrollTo({ top: 0, behavior: 'instant' });
+                      },
+                      footer: renderFooter,
+                    } : undefined}
                   />
-                  <p className="set-help">
-                    待完成组为建议值，确认后才计入记录。
-                  </p>
+                  {!compact && <p className="set-help">待完成组为建议值，确认后才计入记录。</p>}
                   {data.settings.showRpe && (
                     <p className="set-help">
                       递减、力竭计入工作组，热身不计容量。RPE 为可选主观用力：6
@@ -429,7 +466,7 @@ export default function Workout({
                     <button
                       className="btn btn-ghost"
                       disabled={disabled || item.sets.length >= 30}
-                      onClick={() =>
+                      onClick={() => {
                         void update((s) => ({
                           ...s,
                           exercises: s.exercises.map((ex) =>
@@ -450,8 +487,9 @@ export default function Workout({
                               : ex,
                           ),
                           updatedAt: new Date().toISOString(),
-                        }))
-                      }
+                        }));
+                        if (compact && pending < 0) view.current?.scrollTo({ top: 0, behavior: 'instant' });
+                      }}
                     >
                       <Icon name="plus" />
                       增加一组
@@ -511,34 +549,7 @@ export default function Workout({
                       placeholder="器械档位、个人提示…"
                     />
                   </label>
-                  <div className="workout-footer">
-                    <button
-                      className="btn btn-secondary"
-                      disabled={!current}
-                      onClick={() => setCurrent(current - 1)}
-                      aria-label="上一动作"
-                    >
-                      <Icon name="back" size={16} />
-                      <span className="workout-previous-label">上一动作</span>
-                    </button>
-                    <button type="button" className="btn btn-secondary workout-queue-mobile"
-                      aria-controls="workout-queue" aria-expanded={queueOpen} aria-label={`动作 ${current + 1}/${session.exercises.length}`}
-                      onClick={toggleQueue}>{current + 1}/{session.exercises.length} <span>动作</span></button>
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => {
-                        if (current < session.exercises.length - 1)
-                          setCurrent(current + 1);
-                        else endWorkout();
-                      }}
-                      disabled={!writable || session.status === "paused" || busy}
-                    >
-                      {current < session.exercises.length - 1
-                        ? "下一动作"
-                        : "完成本次训练"}
-                      <Icon name="arrow" />
-                    </button>
-                  </div>
+                  {!compact && renderFooter()}
                 </section>
               ) : (
                 <section className="card empty-state">

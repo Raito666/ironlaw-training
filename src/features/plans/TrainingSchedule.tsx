@@ -71,12 +71,9 @@ export function TrainingDateForm({ template, choices = {}, schedule, whole, edit
   );
 }
 
-export const trainingStarted = (entry: TrainingDate, sessions: Session[]) =>
-  sessions.some((session) => session.templateId === entry.templateId && session.date === entry.date && session.status !== 'cancelled');
-
-export function TrainingReminder({ entries, sessions, onOpen }: {
+export function TrainingReminder({ entries, findSession, onOpen }: {
   entries: TrainingDate[];
-  sessions: Session[];
+  findSession: (entry: TrainingDate) => Session | undefined;
   onOpen: () => void;
 }) {
   const [now, setNow] = useState(() => new Date());
@@ -86,7 +83,7 @@ export function TrainingReminder({ entries, sessions, onOpen }: {
     document.addEventListener('visibilitychange', refresh);
     return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', refresh); };
   }, []);
-  const due = entries.filter((entry) => !trainingStarted(entry, sessions) && isTrainingDue(entry, now));
+  const due = entries.filter((entry) => !findSession(entry) && isTrainingDue(entry, now));
   return due.length > 0 && (
     <aside className="card training-reminder" aria-label="训练提醒" aria-live="polite">
       <p><strong>训练提醒</strong> · 有 {due.length} 场训练到了提醒时间。</p>
@@ -95,33 +92,46 @@ export function TrainingReminder({ entries, sessions, onOpen }: {
   );
 }
 
-export function TrainingSchedulePanel({ schedule, sessions, resolveTemplate, openStart, writable }: {
+export function TrainingSchedulePanel({ schedule, findSession, resolveTemplate, openStart, onView, writable }: {
   schedule: TrainingScheduleController;
-  sessions: Session[];
+  findSession: (entry: TrainingDate) => Session | undefined;
   resolveTemplate: (entry: TrainingDate) => WorkoutTemplate | undefined;
-  openStart: (template: WorkoutTemplate) => void;
+  openStart: (template: WorkoutTemplate, scheduleId: string) => void;
+  onView: (session: Session) => void;
   writable: boolean;
 }) {
   const [feedback, setFeedback] = useState('');
   if (!schedule.entries.length && !schedule.migrationError) return null;
+  const today = localTrainingDate();
   return (
     <section id="training-schedule" className="card training-schedule" aria-labelledby="training-schedule-heading">
       <h2 id="training-schedule-heading"><Icon name="calendar" size={20} /> 训练排期</h2>
-      <p className="muted">网页打开时会显示到点提示。关闭网页后的提醒由手机日历负责，需要先把事件加入日历。</p>
-      <p className="muted">手机和电脑连接同一云同步空间后，会共享排期、改期与取消结果。</p>
+      <details className="schedule-help">
+        <summary>提醒与同步说明</summary>
+        <p className="muted">网页打开时会显示到点提示。关闭网页后的提醒由手机日历负责，需要先把事件加入日历。</p>
+        <p className="muted">手机和电脑连接同一云同步空间后，会共享排期、改期与取消结果。</p>
+        <p className="muted">使用 Google 日历时，在保存事件前设置所选的提醒时间。</p>
+      </details>
       {schedule.migrationError && <p role="alert">{schedule.migrationError}</p>}
       <ul>
         {schedule.entries.map((entry) => {
           const template = resolveTemplate(entry);
-          const started = trainingStarted(entry, sessions);
+          const session = findSession(entry);
+          const completed = session?.status === 'completed';
+          const missed = entry.date < today;
           const archived = !template || template.archived;
+          const reminder = entry.lead ? `提前 ${entry.lead} 分钟提醒` : '到点提醒';
+          const status = completed ? (session.date > entry.date ? '已补练' : '已完成') : session ? '训练进行中' : missed ? '待补练' : reminder;
           return (
             <li key={entry.id}>
-              <h3 className="wrap-cjk">{template?.name ?? '原模板暂不可用'}</h3>
-              <p className="muted">{entry.date} · {entry.time} · {started ? '当天已有训练' : entry.lead ? `提前 ${entry.lead} 分钟提醒` : '到点提醒'}</p>
+              <h3 className="wrap-cjk">{template?.name ?? session?.name ?? '原模板暂不可用'}</h3>
+              <p className="muted">{entry.date} · {entry.time} · {status}</p>
               <div className="row wrap training-schedule-actions">
-                {template && !archived && <>
-                  <button type="button" className="btn btn-primary" disabled={!writable} onClick={() => openStart(template)}>按排期开练</button>
+                {completed && <button type="button" className="btn btn-secondary" onClick={() => onView(session)}>查看训练记录</button>}
+                {template && !archived && !completed && <button type="button" className="btn btn-primary" disabled={!writable} onClick={() => openStart(template, entry.id)}>
+                  {session ? '继续这场训练' : missed ? '补练' : '按排期开练'}
+                </button>}
+                {template && !archived && !session && !missed && <>
                   <button type="button" className="btn btn-secondary" onClick={() => {
                     setFeedback('');
                     void exportTextFile({ name: '铁律训练.ics', text: calendarFile(entry, template.name), type: 'text/calendar;charset=utf-8' })
@@ -135,10 +145,9 @@ export function TrainingSchedulePanel({ schedule, sessions, resolveTemplate, ope
                     await schedule.remove(entry.id);
                     setFeedback('已移除排期。已加入系统日历的事件可在日历内删除。');
                   } catch { setFeedback('排期未能移除，请重试。'); }
-                }}>取消这场排期</button>
+                }}>{completed ? '移除这条排期' : '取消这场排期'}</button>
               </div>
-              {template && !archived && !started && <TrainingDateForm template={template} schedule={schedule} edit={entry} />}
-              {template && !archived && <p className="muted">使用 Google 日历时，在保存事件前设置所选的提醒时间。</p>}
+              {template && !archived && !session && <TrainingDateForm template={template} schedule={schedule} edit={entry} />}
             </li>
           );
         })}

@@ -6,7 +6,8 @@ import { SqliteRepository } from '../../src/data/sqlite-repository';
 import { migrateSqliteSchema } from '../../src/data/sqlite-migration';
 import { TestSqliteDatabase } from '../helpers/sqlite-database';
 import { StoreConflictError } from '../../src/data/repository';
-import { withTrainingSchedule } from '../../src/data/migrations';
+import { withScheduleLinks, withTrainingSchedule } from '../../src/data/migrations';
+import { completeSession, createSession, reviewSession, toggleSet } from '../../src/domain/training';
 const legacy = () =>
   JSON.parse(readFileSync(new URL('../fixtures/legacy-v1-ui-backup.json', import.meta.url), 'utf8')).data;
 const opened: IndexedDbRepository[] = [];
@@ -70,6 +71,27 @@ describe('persisted payload migration', () => {
     expect(await rawRead('pre-schema-v2')).toEqual(old);
     expect(await repo.load()).toEqual(upgraded);
     await expect(repo.save(v2, v2.revision)).rejects.toBeInstanceOf(StoreConflictError);
+  });
+  it('keeps the SQLite v3 payload before recording a v4 occurrence link', async () => {
+    const db = new TestSqliteDatabase();
+    const repo = new SqliteRepository(db, async () => legacy());
+    try {
+      const v2 = await repo.load();
+      const template = v2.templates[0];
+      const date = { id: 'native-missed-date', templateId: template.id, date: '2026-11-11', time: '19:00', lead: 15, choices: {} };
+      const v3 = await repo.save(withTrainingSchedule(v2, [date]), v2.revision);
+      const now = Date.parse('2026-11-12T08:00:00Z');
+      const draft = { ...createSession(template, v3.exercises, now), scheduleId: date.id };
+      const logged = toggleSet(draft, draft.exercises[0].id, draft.exercises[0].sets[0].id, now + 1000);
+      const result = completeSession(reviewSession(logged, now + 2000), now + 2000);
+      const v4 = await repo.save(withScheduleLinks({ ...v3, sessions: [...v3.sessions, result] }), v3.revision);
+      expect(v4).toMatchObject({ schemaVersion: 4, trainingSchedule: [date], sessions: [...v3.sessions, result] });
+      expect(db.handle.prepare('SELECT value FROM storage_meta WHERE key=?').get('appdata-before-v4')?.value).toBe(JSON.stringify(v3));
+      expect(await repo.load()).toEqual(v4);
+      await expect(repo.save(v3, v3.revision)).rejects.toBeInstanceOf(StoreConflictError);
+    } finally {
+      await db.close();
+    }
   });
   it('combines native payload migration and old catalog expansion in one revision', async () => {
     const db = new TestSqliteDatabase(),

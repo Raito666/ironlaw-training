@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialData } from '../../src/domain/seed';
-import { completeSession, createSession, createSessionExercise, pauseSession, resumeSession, reviewSession, sessionStats, toggleSet } from '../../src/domain/training';
+import { completeSession, createRepeatedSession, createSession, createSessionExercise, pauseSession, resumeSession, reviewSession, sessionStats, toggleSet } from '../../src/domain/training';
 import type { Exercise, Session } from '../../src/domain/types';
 
 const start = Date.parse('2026-10-15T10:00:00.000Z');
@@ -14,6 +14,24 @@ function workout(): Session {
 function mark(session: Session, index: number, now = start + 1000): Session { return toggleSet(session, session.exercises[0].id, session.exercises[0].sets[index].id, now); }
 
 describe('training calculation and lifecycle', () => {
+  it('repeats actual set values and types in order without carrying over the old occurrence or completion state', () => {
+    const initial = workout();
+    initial.templateId = 'strength-plan';
+    initial.scheduleId = 'old-occurrence';
+    initial.exercises[0].sets[0].rpe = 8;
+    initial.exercises[0].sets[1].status = 'skipped';
+    const original = completeSession(reviewSession(mark(mark(initial, 0), 2), start + 2000), start + 2000);
+    const before = structuredClone(original);
+    const repeated = createRepeatedSession(original, start + 86400000);
+    expect(repeated).toMatchObject({ status: 'active', restUntil: null, restDuration: original.restDuration });
+    expect(repeated.templateId).toBeUndefined();
+    expect(repeated.scheduleId).toBeUndefined();
+    expect(repeated.exercises[0].sets.map(({ type, weightKg, status, rpe }) => [type, weightKg, status, rpe])).toEqual([
+      ['work', 60, 'pending', undefined], ['warmup', 20, 'pending', undefined],
+    ]);
+    expect(repeated.exercises[0].sets[0].id).not.toBe(original.exercises[0].sets[0].id);
+    expect(original).toEqual(before);
+  });
   it('counts only actual completed work sets in volume and recalculates undo', () => {
     const initial = workout();
     expect(sessionStats(initial).volumeKg).toBe(0);

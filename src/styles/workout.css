@@ -2,8 +2,10 @@
 .main:has(.workout-view) { position: relative; }
 .main:has(.workout-view) > .topbar { position: absolute; top: 32px; right: 40px; margin-bottom: 0; }
 .main:has(.workout-view) .workout-header { padding-right: var(--layout-header-reserve); }
-.main:has(.workout-view) > :is(.readonly-banner, .error-banner, .offline-banner) ~ .topbar { position: static; margin-bottom: var(--space-5); }
-.main:has(.workout-view) > :is(.readonly-banner, .error-banner, .offline-banner) ~ .workout-view .workout-header { padding-right: 0; }
+.main:has(.workout-view) > :is(.readonly-banner, .error-banner) ~ .topbar,
+.main:has(.workout-view:not(.workout-focus)) > .offline-banner ~ .topbar { position: static; margin-bottom: var(--space-5); }
+.main:has(.workout-view) > :is(.readonly-banner, .error-banner) ~ .workout-view .workout-header,
+.main:has(.workout-view:not(.workout-focus)) > .offline-banner ~ .workout-view .workout-header { padding-right: 0; }
 .workout-header > div { min-width: 0; }
 .workout-header h1 { font-size: var(--text-xl); }
 .workout-header .btn { flex-shrink: 0; }

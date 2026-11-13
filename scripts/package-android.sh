@@ -22,7 +22,7 @@ test -f "$unsigned"
 "$build_tools/zipalign" -c -P 16 4 "$out/ironlaw-android-aligned.apk"
 "$build_tools/aapt" dump badging "$out/ironlaw-android-aligned.apk" > "$out/android-badging.txt"
 grep -q "name='com.jianlibao.app'" "$out/android-badging.txt"
-grep -q "versionCode='2'" "$out/android-badging.txt"
+grep -q "versionCode='3'" "$out/android-badging.txt"
 grep -q "versionName='0.4.0'" "$out/android-badging.txt"
 cp "$build_tools/lib/apksigner.jar" "$out/apksigner.jar"
 (cd "$out" && shasum -a 256 ironlaw-android-aligned.apk apksigner.jar > android-SHA256SUMS.txt)

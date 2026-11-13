@@ -39,6 +39,9 @@ export class SqliteRepository implements Repository {
       if (current.schemaVersion === 2 && validated.schemaVersion === 3) {
         await tx.run('INSERT OR IGNORE INTO storage_meta (key, value) VALUES (?, ?)', ['appdata-v2-before-v3', JSON.stringify(current)]);
       }
+      if (current.schemaVersion < 4 && validated.schemaVersion === 4) {
+        await tx.run('INSERT OR IGNORE INTO storage_meta (key, value) VALUES (?, ?)', ['appdata-before-v4', JSON.stringify(current)]);
+      }
       const next = { ...validated, revision: current.revision + 1 };
       const changes = await tx.run("UPDATE workspace SET revision=?, payload=? WHERE id='main' AND revision=?", [
         next.revision,

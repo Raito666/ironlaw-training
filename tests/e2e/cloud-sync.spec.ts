@@ -5,7 +5,7 @@ import { join as joinPath } from 'node:path';
 import { getE2ERunDirectory } from '../../scripts/e2e-output.mjs';
 import { createSyncHandler } from '../../netlify/functions/lib/sync-handler.mjs';
 import { credentials } from '../../src/sync/crypto';
-import { storedWorkspace, backupFile } from './helpers';
+import { enableStarterTemplate, storedWorkspace, backupFile } from './helpers';
 import { trainingScheduleKey } from '../../src/features/plans/schedule';
 
 const folder = joinPath(getE2ERunDirectory(), 'cloud-sync');
@@ -128,6 +128,20 @@ test('排期双设备迁移、整套每周重复、改期和取消同步', async
     expect(desktop.trainingSchedule?.some(({ date }) => date === '2030-02-14')).toBe(false);
     expect(desktop.bodyMetrics[0]?.weightKg).toBe(70);
     await pa.reload(); await count(pa).toBe(6);
+
+    await pb.clock.setFixedTime(new Date('2030-02-06T08:00:00Z'));
+    await pb.goto(plans);
+    await schedule.getByRole('listitem').filter({ hasText: '2030-02-05' }).getByRole('button', { name: '补练', exact: true }).click();
+    await pb.getByRole('button', { name: '完成弹力带绕肩第1组', exact: true }).click();
+    await pb.getByRole('button', { name: '结束训练', exact: true }).click();
+    await pb.getByRole('button', { name: '保存已完成 1 组', exact: true }).click();
+    await expect(pb).toHaveURL(/#\/progress$/);
+    await finishSync(pb); await finishSync(pa);
+    await expect.poll(async () => (await storedWorkspace(pa)).sessions.find(({ scheduleId }) => scheduleId === first.id)?.date).toBe('2030-02-06');
+    expect((await storedWorkspace(pa)).schemaVersion).toBe(4);
+    expect((await storedWorkspace(pa)).bodyMetrics).toEqual(desktop.bodyMetrics);
+    await pa.goto(plans);
+    await expect(pa.getByRole('region', { name: '训练排期' }).getByText('2030-02-05 · 19:00 · 已补练')).toBeVisible();
   } finally { await a.close(); await b.close(); }
 });
 
@@ -218,6 +232,7 @@ test('归档训练、动作和模板完整同步，接收设备的草稿和偏�
   await route(a, handler); await route(b, handler);
   const pa = await a.newPage(), pb = await b.newPage();
   try {
+    await enableStarterTemplate(pa);
     await settings(pa); const key = await create(pa);
     await pa.goto('/'); await pa.getByRole('button', { name: '开始今天的训练', exact: true }).click();
     await pa.getByLabel('杠铃深蹲第1组总重量', { exact: true }).fill('60');
@@ -234,7 +249,8 @@ test('归档训练、动作和模板完整同步，接收设备的草稿和偏�
     await pa.getByRole('button', { name: '确认导入', exact: true }).click();
     await expect(pa.getByRole('dialog')).not.toBeVisible(); await sync(pa);
     const original = await storedWorkspace(pa);
-    await pb.goto('/'); await pb.getByRole('button', { name: '开始今天的训练', exact: true }).click();
+    await enableStarterTemplate(pb);
+    await pb.getByRole('button', { name: '开始今天的训练', exact: true }).click();
     const beforeJoin = await storedWorkspace(pb), draft = beforeJoin.sessions[0];
     await join(pb, key);
     const received = await storedWorkspace(pb);

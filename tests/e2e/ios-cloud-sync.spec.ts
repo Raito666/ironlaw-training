@@ -4,7 +4,7 @@ import { mkdir } from 'node:fs/promises';
 import { join as joinPath } from 'node:path';
 import { getE2ERunDirectory } from '../../scripts/e2e-output.mjs';
 import { cloudBackend, nativeCloudBridge, nativeActivity, webCloud } from './native-cloud-helpers';
-import { storedWorkspace } from './helpers';
+import { backupFile, storedWorkspace } from './helpers';
 test.use({ serviceWorkers: 'block' });
 const folder = joinPath(getE2ERunDirectory(), 'ios-cloud-sync');
 async function settings(page: Page) {
@@ -50,9 +50,24 @@ test('原生SQLite与Web往返同步，训练/密钥导出及重开保留，备�
   let reopened: Awaited<ReturnType<typeof nativeCloudBridge>> | null = null;
   try {
     await settings(pa); await body(pa, 70); const key = await create(pa);
+    const trainingData = native.data();
+    trainingData.templates[0].updatedAt = '2026-10-16T00:00:00.000Z';
+    // Activate this fixture on both peers. Keep this test focused on training
+    // and body sync without introducing a separate template conflict.
+    for (const peer of [pa, pb]) {
+      await settings(peer);
+      await peer.getByLabel('选择健力宝备份文件', { exact: true }).setInputFiles(backupFile(trainingData));
+      const preview = peer.getByRole('dialog', { name: '预览导入备份', exact: true });
+      await selectChoice(preview, '冲突处理', 'use-import');
+      await preview.getByRole('checkbox', { name: '我已查看冲突项，确认按所选方式合并' }).check();
+      await preview.getByRole('button', { name: '确认导入', exact: true }).click();
+      await expect(preview).toBeHidden();
+    }
     await pa.goto('/'); await pa.getByRole('button', { name: '开始今天的训练', exact: true }).click();
     await pa.getByLabel('杠铃深蹲第1组总重量', { exact: true }).fill('60'); await pa.getByLabel('杠铃深蹲第1组次数', { exact: true }).fill('10');
-    await pa.getByRole('button', { name: '完成杠铃深蹲第1组', exact: true }).click(); await pa.getByRole('button', { name: '提前回顾', exact: true }).click(); await pa.getByRole('button', { name: '保存训练', exact: true }).click();
+    await pa.getByRole('button', { name: '完成杠铃深蹲第1组', exact: true }).click();
+    await pa.getByRole('button', { name: '结束训练', exact: true }).click();
+    await pa.getByRole('button', { name: '保存已完成 1 组', exact: true }).click();
     await expect.poll(() => native.data().sessions[0]?.status).toBe('completed'); await settings(pa); await sync(pa);
     await settings(pb); await join(pb, key);
     await expect.poll(async () => (await storedWorkspace(pb)).bodyMetrics[0]?.weightKg).toBe(70);

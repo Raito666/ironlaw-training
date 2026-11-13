@@ -1,6 +1,23 @@
-import type { TrainingDate } from '../../domain/types';
+import type { Session, TrainingDate, WorkoutTemplate } from '../../domain/types';
 import { trainingReminderLeads, validateTrainingSchedule } from '../../data/backup';
 export type { TrainingDate } from '../../domain/types';
+export type ScheduledTraining = { entry: TrainingDate; template: WorkoutTemplate };
+
+export function indexScheduledSessions(sessions: Session[]) {
+  const links = new Map<string, Session>();
+  const byDate = new Map<string, Session>();
+  for (const session of sessions) {
+    if (!session.templateId || session.status === 'cancelled') continue;
+    const index = session.scheduleId ? links : byDate;
+    const key = session.scheduleId ?? `${session.date}/${session.templateId}`;
+    const existing = index.get(key);
+    if (!existing || (existing.status !== 'completed' && session.status === 'completed')) index.set(key, session);
+  }
+  return (entry: TrainingDate) => {
+    const linked = links.get(entry.id);
+    return linked?.templateId === entry.templateId ? linked : byDate.get(`${entry.date}/${entry.templateId}`);
+  };
+}
 
 export const trainingScheduleKey = 'jianlibao.training-schedule.v1';
 export const reminderLeads = trainingReminderLeads;

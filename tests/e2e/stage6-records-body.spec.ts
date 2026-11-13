@@ -1,7 +1,7 @@
 import { expectChoiceValue, selectChoice } from './choice-helpers';
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { backupFile, expectPersisted, storedWorkspace } from './helpers';
+import { backupFile, enableStarterTemplate, expectPersisted, storedWorkspace } from './helpers';
 import { overflowFindings } from './overflow-helpers';
 import { sessionStats } from '../../src/domain/training';
 
@@ -244,6 +244,7 @@ test('已落盘v1自动迁移保留回退副本，第二页面身体数据只读
 });
 
 test('新组类型与RPE贯穿训练、刷新、回顾、历史修正，关闭偏好保留已有RPE', async ({ page }) => {
+  await enableStarterTemplate(page);
   await settings(page);
   await page.getByLabel('显示主观用力 RPE', { exact: true }).check();
   await expectPersisted(page, (d) => d.settings.showRpe);
@@ -315,12 +316,14 @@ for (const width of [320, 390, 768, 1440])
   for (const theme of ['dark', 'light'] as const)
     test(`${width}px ${theme} RPE训练行不越界且完成按钮可操作`, async ({ page }, info) => {
       await page.setViewportSize({ width, height: width < 768 ? 667 : 1000 });
+      await enableStarterTemplate(page);
       await settings(page);
       await selectChoice(page, '界面主题', theme);
       await page.getByLabel('显示主观用力 RPE', { exact: true }).check();
       await expectPersisted(page, (d) => d.settings.showRpe);
       await page.goto('/#/today');
       await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
+      if (width <= 760) await page.locator('.workout-set-options > summary').click();
       await selectChoice(page, '杠铃深蹲第1组类型', 'failure');
       await selectChoice(page, '杠铃深蹲第1组RPE', '9.5');
       await expect.poll(() => overflowFindings(page)).toEqual([]);

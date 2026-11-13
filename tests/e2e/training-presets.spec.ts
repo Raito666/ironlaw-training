@@ -120,7 +120,7 @@ test('原图直达、详细说明和手机训练排期可重开、提醒并按�
     session.exercises[2].exercise.id === 'reference-band-chest-press' && session.exercises[2].sets.every((set) => set.type === 'warmup')));
   await page.goto('/mobile/#/plans?preset=photo-complete');
   await expect(page.getByRole('complementary', { name: '训练提醒' })).toHaveCount(0);
-  await expect(schedule.getByText('2026-11-11 · 19:30 · 当天已有训练')).toBeVisible();
+  await expect(schedule.getByText('2026-11-11 · 19:30 · 训练进行中')).toBeVisible();
   await schedule.getByRole('button', { name: '取消这场排期' }).click();
   await expect(schedule).toHaveCount(0);
 });

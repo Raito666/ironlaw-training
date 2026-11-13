@@ -7,7 +7,12 @@ export function migrateAppDataV1(data: LegacyAppData): AppData {
 
 /** Upgrade on the first schedule write or import. Older workspaces remain valid v2. */
 export function withTrainingSchedule(data: AppData, trainingSchedule: TrainingDate[]): AppData {
-  return { ...data, schemaVersion: 3, trainingSchedule };
+  return { ...data, schemaVersion: data.schemaVersion === 4 ? 4 : 3, trainingSchedule };
+}
+
+/** Only a workspace with an explicit session-to-schedule link needs v4. */
+export function withScheduleLinks(data: AppData): AppData {
+  return { ...data, schemaVersion: 4, trainingSchedule: data.trainingSchedule ?? [] };
 }
 
 export function migrateLocalSchedule(data: AppData, legacy: TrainingDate[]): AppData {

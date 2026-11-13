@@ -56,6 +56,137 @@ async function start(page: Page) {
   await page.getByRole('button', { name: '开始今天的训练', exact: true }).click();
 }
 
+test.describe('手机原地记组', () => {
+  test.use({ hasTouch: true });
+
+  for (const [width, height] of [[320, 568], [390, 740]]) {
+    test(`${width}px 连记四组，重开保持当前组和剩余休息`, async ({ page }, info) => {
+      await page.setViewportSize({ width, height });
+      const data = fixture();
+      data.templates[0].items[0].sets = 4;
+      data.templates[0].restSeconds = 90;
+      await install(page, data);
+      await start(page);
+      const control = (group: number) => page.getByRole('button', { name: `完成杠铃深蹲第${group}组`, exact: true });
+      const region = page.locator('.workout-view');
+      const rest = page.getByRole('region', { name: '组间休息' });
+      const first = (await control(1).boundingBox())!;
+      const tap = { x: first.x + first.width / 2, y: first.y + first.height / 2 };
+      await control(1).evaluate((button) => {
+        const observer = new MutationObserver(() => {
+          observer.disconnect();
+          button.setAttribute('data-test-second-tap', 'sent');
+          button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+        });
+        observer.observe(button, { attributeFilter: ['aria-label'] });
+      });
+
+      for (let group = 1; group <= 4; group++) {
+        const active = control(group);
+        await expect(active).toBeEnabled();
+        await expect.poll(() => active.evaluate((element, point) => element.contains(document.elementFromPoint(point.x, point.y)), tap)).toBe(true);
+        await expect(page.getByLabel(`杠铃深蹲第${group}组总重量`, { exact: true })).toBeInViewport();
+        const quick = page.getByRole('button', { name: `增加杠铃深蹲第${group}组次数`, exact: true });
+        const adjustBounds = (await quick.boundingBox())!;
+        const regionBounds = (await region.boundingBox())!;
+        expect(adjustBounds.y + adjustBounds.height).toBeLessThanOrEqual(regionBounds.y + regionBounds.height + 1);
+        expect(await region.evaluate((element) => element.scrollTop)).toBe(0);
+        await page.touchscreen.tap(tap.x, tap.y);
+        await expectPersisted(page, ({ sessions }) => sessions.at(-1)?.exercises[0].sets.filter((set) => set.status === 'completed').length === group);
+        await expect(rest).toHaveAttribute('data-rest-running', 'true');
+
+        if (group === 1) {
+          await expect(control(2)).toHaveAttribute('data-test-second-tap', 'sent');
+          const deadline = (await storedWorkspace(page)).sessions.at(-1)!.restUntil;
+          await page.reload();
+          await expect(control(2)).toBeEnabled();
+          expect((await storedWorkspace(page)).sessions.at(-1)!.restUntil).toBe(deadline);
+          await expect(rest).toHaveAttribute('data-rest-running', 'true');
+          await page.screenshot({ path: info.outputPath(`${width}-current-second-set.png`), animations: 'disabled' });
+        }
+        await page.clock.fastForward(400);
+      }
+      await page.getByRole('button', { name: '结束训练', exact: true }).tap();
+      await expect(page).toHaveURL(/#\/progress$/);
+      await expectPersisted(page, ({ sessions }) => sessions.at(-1)?.status === 'completed');
+    });
+  }
+
+  test('逐组参考保留模板目标，选择历史只填当前组', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    const data = fixture();
+    const move = data.sessions[0].exercises[0];
+    const history = createSessionExercise(move.exercise, 4).sets;
+    const marks = [[50, 12], [60, 8], [65, 6], [55, 10]];
+    move.sets = [move.sets[1], ...history.map((set, index) => ({
+      ...set, status: 'completed' as const, weightKg: marks[index][0], reps: marks[index][1],
+    }))];
+    move.note = '上次用了深蹲架 3 档';
+    Object.assign(data.templates[0].items[0], { sets: 4, weightKg: 62.5, reps: 7 });
+    await install(page, data);
+    await start(page);
+    await expect(page.getByLabel('杠铃深蹲第1组总重量', { exact: true })).toHaveValue('62.5');
+    await expect(page.getByLabel('杠铃深蹲第1组次数', { exact: true })).toHaveValue('7');
+    const prior = page.getByRole('button', { name: '用上次杠铃深蹲第1组成绩', exact: true });
+    await expect(prior).toContainText('50 kg × 12');
+    await prior.tap();
+    await page.getByRole('button', { name: '完成杠铃深蹲第1组', exact: true }).tap();
+    await expect(page.getByRole('button', { name: '用上次杠铃深蹲第2组成绩', exact: true })).toContainText('60 kg × 8');
+    await page.getByText('逐组历史', { exact: true }).tap();
+    await expect(page.getByText('上次用了深蹲架 3 档')).toBeVisible();
+    await page.getByRole('button', { name: '填入历史正式第3组', exact: true }).tap();
+    await expectPersisted(page, ({ sessions }) => {
+      const sets = sessions.at(-1)!.exercises[0].sets;
+      return sets[0].status === 'completed' && sets[0].weightKg === 50 && sets[0].reps === 12 &&
+        sets[1].status === 'pending' && sets[1].weightKg === 65 && sets[1].reps === 6 &&
+        sets.slice(2).every((set) => set.weightKg === 62.5 && set.reps === 7 && set.status === 'pending');
+    });
+    expect((await storedWorkspace(page)).sessions[0]).toEqual(data.sessions[0]);
+  });
+
+  test('先练最后一个动作后，固定栏可回到尚未记录的动作', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    const data = fixture();
+    data.templates[0].items[0].sets = 1;
+    data.templates[0].items.push({ id: 'test-last-move', exerciseId: 'ex-plank', sets: 1, weightKg: 0, reps: 1, durationSeconds: 30 });
+    await install(page, data);
+    await start(page);
+    await page.getByRole('button', { name: '下一动作', exact: true }).tap();
+    await expect(page.getByLabel('平板支撑第1组时长', { exact: true })).toBeInViewport();
+    await page.getByRole('button', { name: '完成平板支撑第1组', exact: true }).tap();
+    await page.getByRole('button', { name: '回到待练动作', exact: true }).tap();
+    await expect(page.getByRole('button', { name: '完成杠铃深蹲第1组', exact: true })).toBeInViewport();
+    await expectPersisted(page, ({ sessions }) => sessions.at(-1)?.exercises[1].sets[0].status === 'completed');
+  });
+
+  test('从历史复练逐组带入实际值和类型，原记录保留', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    const data = fixture();
+    const original = data.sessions[0];
+    const move = original.exercises[0];
+    move.sets = [
+      { ...move.sets[1], weightKg: 30, reps: 12 },
+      { ...move.sets[0], weightKg: 60, reps: 8, rpe: 8 },
+      { ...move.sets[0], id: 'repeat-set-three', weightKg: 55, reps: 10, type: 'drop' },
+      { ...move.sets[0], id: 'repeat-skipped', status: 'skipped' },
+    ];
+    await install(page, data);
+    await page.goto('/#/progress');
+    await page.locator('.session-card').first().tap();
+    await page.getByRole('button', { name: '再练一次', exact: true }).tap();
+    await page.getByRole('button', { name: '确认开始训练', exact: true }).tap();
+    await expect(page.getByLabel('杠铃深蹲第1组总重量', { exact: true })).toHaveValue('30');
+    await expectPersisted(page, ({ sessions }) => sessions.length === 2);
+    const saved = await storedWorkspace(page);
+    expect(saved.sessions[0]).toEqual(original);
+    const draft = saved.sessions[1];
+    expect(draft.exercises[0].sets.map(({ type, weightKg, reps, status, rpe }) => [type, weightKg, reps, status, rpe])).toEqual([
+      ['warmup', 30, 12, 'pending', undefined], ['work', 60, 8, 'pending', undefined], ['drop', 55, 10, 'pending', undefined],
+    ]);
+    expect(draft.restUntil).toBeNull();
+  });
+});
+
 test('练完所有组后从固定结束入口直接归档', async ({ page }) => {
   const data = fixture();
   data.templates[0].items[0].sets = 1;
@@ -176,11 +307,13 @@ test('无声音震动API仍显示休息结束且不破坏记录', async ({ page 
   expect(errors).toEqual([]);
 });
 
-test('历史最后正式组预填待确认，刷新不覆盖已编辑草稿或历史', async ({ page }) => {
+test('可填入同组正式成绩，刷新不覆盖已编辑草稿或历史', async ({ page }) => {
   const data = fixture();
   await install(page, data);
   await start(page);
   const weight = page.getByLabel('杠铃深蹲第1组总重量', { exact: true });
+  await expect(weight).toHaveValue('0');
+  await page.getByRole('button', { name: '用上次杠铃深蹲第1组成绩', exact: true }).click();
   await expect(weight).toHaveValue('60');
   await expect(page.getByLabel('杠铃深蹲第1组次数', { exact: true })).toHaveValue('8');
   await expect(page.getByText('待完成组为建议值，确认后才计入记录。', { exact: true })).toBeVisible();
@@ -212,6 +345,7 @@ test('增加一组优先本次实际成绩，复制上一组只填数值不完�
 test('kg重量次数快调有界，完成与暂停时不可改', async ({ page }) => {
   await install(page, fixture());
   await start(page);
+  await page.getByRole('button', { name: '用上次杠铃深蹲第1组成绩', exact: true }).click();
   const plus = page.getByRole('button', { name: '增加杠铃深蹲第1组总重量', exact: true });
   const minus = page.getByRole('button', { name: '减少杠铃深蹲第1组总重量', exact: true });
   await plus.click();
@@ -236,6 +370,7 @@ test('lb快调5lb，原始kg与历史不因单位转换重写', async ({ page })
   await install(page, data);
   await start(page);
   const weight = page.getByLabel('杠铃深蹲第1组总重量', { exact: true });
+  await page.getByRole('button', { name: '用上次杠铃深蹲第1组成绩', exact: true }).click();
   await expect(weight).toHaveValue('132.28');
   await page.getByRole('button', { name: '增加杠铃深蹲第1组总重量', exact: true }).click();
   await expect(weight).toHaveValue('137.28');
@@ -250,10 +385,11 @@ for (const [id, name, field, value] of [
   ['ex-pushup', '俯卧撑', '次数', '8'],
   ['ex-plank', '平板支撑', '时长', '50'],
 ])
-  test(`${field}类沿用实际成绩并支持快调`, async ({ page }) => {
+  test(`${field}类可显式使用实际成绩并支持快调`, async ({ page }) => {
     await install(page, fixture(id));
     await start(page);
     const input = page.getByLabel(`${name}第1组${field}`, { exact: true });
+    await page.getByRole('button', { name: `用上次${name}第1组成绩`, exact: true }).click();
     await expect(input).toHaveValue(value);
     await page.getByRole('button', { name: `增加${name}第1组${field}`, exact: true }).click();
     await expect(input).toHaveValue(String(Number(value) + 1));
@@ -262,15 +398,20 @@ for (const [id, name, field, value] of [
 for (const width of [320, 390, 768, 1440])
   test(`${width}px训练控件深浅主题均无导航和休息浮层遮挡`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 844 });
-    await install(page, fixture());
+    const data = fixture();
+    // Keep the enabled Skip button in the hit-test enumeration in both themes.
+    data.templates[0].restSeconds = 180;
+    await install(page, data);
     await start(page);
     if (width <= 760) await expect(page.getByRole('navigation', { name: '移动端导航', exact: true })).toHaveCount(0);
     if (width <= 760) {
       const firstComplete = (await page.getByRole('button', { name: '完成杠铃深蹲第1组', exact: true }).boundingBox())!;
       const scrollArea = (await page.locator('.workout-view').boundingBox())!;
-      expect(firstComplete.y + firstComplete.height).toBeLessThanOrEqual(scrollArea.y + scrollArea.height);
+      expect(firstComplete.y).toBeGreaterThanOrEqual(scrollArea.y + scrollArea.height);
+      expect(firstComplete.y + firstComplete.height).toBeLessThanOrEqual(844);
     }
     await page.getByRole('button', { name: '完成杠铃深蹲第1组', exact: true }).click();
+    await expect(page.getByRole('region', { name: '组间休息' })).toHaveAttribute('data-rest-running', 'true');
     for (const theme of ['dark', 'light']) {
       if (theme === 'light') await page.getByRole('button', { name: '切换主题', exact: true }).click();
       for (const element of await page

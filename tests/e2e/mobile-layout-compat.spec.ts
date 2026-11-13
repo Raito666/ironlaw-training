@@ -20,7 +20,7 @@ for (const phone of phones) {
           await route.fulfill({ response, body: css.replace(/@media[^{}]*[<>][^{}]*\{/g, '@media not all{') });
         });
         await page.goto('/');
-        await expect(page.getByRole('button', { name: '开始今天的训练', exact: true })).toBeEnabled();
+        await expect(page.getByRole('button', { name: '开始自由训练', exact: true })).toBeEnabled();
         await expect(page.locator('.sidebar')).toBeHidden();
         const navigation = page.getByRole('navigation', { name: '移动端导航', exact: true });
         await expect(navigation).toBeVisible();

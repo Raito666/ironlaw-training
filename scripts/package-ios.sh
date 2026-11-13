@@ -6,12 +6,27 @@ test -f dist/sw.js
 pnpm exec cap sync ios
 pnpm ios:verify
 
+# CoreSimulator reads the app's Keychain identity from the linked executable.
+# Keep this identity local to the simulator. Xcode supplies the device identity
+# when a developer signs the separate iPhone build with their own team.
+cat > "$out/simulator-entitlements.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>application-identifier</key><string>com.jianlibao.app</string>
+  <key>keychain-access-groups</key><array><string>com.jianlibao.app</string></array>
+</dict></plist>
+PLIST
+printf 'OTHER_LDFLAGS[sdk=iphonesimulator*] = $(inherited) -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __entitlements -Xlinker "$(IRONLAW_SIMULATOR_ENTITLEMENTS)"\n' \
+  > "$out/Simulator.xcconfig"
+
 xcodebuild_app() {
   local sdk="$1" destination="$2"
+  shift 2
   xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
     -sdk "$sdk" -destination "$destination" -derivedDataPath "$out/DerivedData" \
     ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO \
-    CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= build > "$out/$sdk-build.log" 2>&1 || {
+    CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= "$@" build > "$out/$sdk-build.log" 2>&1 || {
       tail -n 65 "$out/$sdk-build.log"
       return 1
     }
@@ -31,9 +46,12 @@ check_app() {
   test "$(xcrun lipo -archs "$app/App")" = arm64
 }
 
-xcodebuild_app iphonesimulator 'generic/platform=iOS Simulator'
+xcodebuild_app iphonesimulator 'generic/platform=iOS Simulator' -xcconfig "$out/Simulator.xcconfig" \
+  "IRONLAW_SIMULATOR_ENTITLEMENTS=$out/simulator-entitlements.plist"
 sim="$out/DerivedData/Build/Products/Release-iphonesimulator/App.app"
 check_app "$sim" IOSSIMULATOR
+xcrun segedit "$sim/App" -extract __TEXT __entitlements "$out/linked-simulator-entitlements.plist"
+cmp "$out/simulator-entitlements.plist" "$out/linked-simulator-entitlements.plist"
 ditto -c -k --sequesterRsrc --keepParent "$sim" "$out/ironlaw-ios-simulator-arm64.zip"
 
 xcodebuild_app iphoneos 'generic/platform=iOS'

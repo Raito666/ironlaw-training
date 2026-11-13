@@ -44,6 +44,7 @@ export interface Session {
   id: string;
   name: string;
   templateId?: string;
+  scheduleId?: string;
   startedAt: string;
   updatedAt: string;
   finishedAt?: string;
@@ -85,7 +86,7 @@ export type TrainingDate = {
   choices: Record<string, string>;
 };
 export interface AppData {
-  schemaVersion: 2 | 3;
+  schemaVersion: 2 | 3 | 4;
   revision: number;
   exercises: Exercise[];
   templates: WorkoutTemplate[];

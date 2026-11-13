@@ -1,5 +1,5 @@
 import type { AppData, AppSettings, BodyMetric, Exercise, LegacyAppData, MeasurementKey, Session, SessionExercise, SetRecord, TemplateItem, TrainingDate, WorkoutTemplate } from '../domain/types';
-import { migrateAppDataV1, withTrainingSchedule } from './migrations';
+import { migrateAppDataV1, withScheduleLinks, withTrainingSchedule } from './migrations';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_TIME = 4_102_444_800_000;
@@ -80,8 +80,10 @@ function sessionExercise(value: unknown, path: string, version: 1 | 2): SessionE
   for (const set of sets) if (set.status === 'completed' && (snapshot.kind === 'duration' ? set.durationSeconds < 1 : set.reps < 1)) fail(`${path}.sets`, '已完成组必须有正次数或正时长');
   return { id: id(v.id, `${path}.id`), exercise: snapshot, sets, note: string(v.note, `${path}.note`, 10000) };
 }
-function session(value: unknown, path: string, version: 1 | 2): Session {
-  const v = object(value, path, ['id', 'name', 'startedAt', 'updatedAt', 'date', 'timeZone', 'status', 'pausedMs', 'restUntil', 'restDuration', 'exercises', 'note'], ['templateId', 'finishedAt', 'pausedAt', 'recordedManually']);
+function session(value: unknown, path: string, version: 1 | 2, scheduleLinks: boolean): Session {
+  const v = object(value, path, ['id', 'name', 'startedAt', 'updatedAt', 'date', 'timeZone', 'status', 'pausedMs', 'restUntil', 'restDuration', 'exercises', 'note'], ['templateId', 'finishedAt', 'pausedAt', 'recordedManually', ...(scheduleLinks ? ['scheduleId'] : [])]);
+  const scheduleId = v.scheduleId === undefined ? undefined : id(v.scheduleId, `${path}.scheduleId`);
+  if (scheduleId && v.templateId === undefined) fail(`${path}.scheduleId`, '排期训练必须包含原模板标识');
   const date = string(v.date, `${path}.date`, 10, true);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < '1970-01-01' || date > '2100-01-01' || !Number.isFinite(Date.parse(`${date}T00:00:00.000Z`)) || new Date(`${date}T00:00:00.000Z`).toISOString().slice(0, 10) !== date) fail(`${path}.date`, '本地日期无效');
   const timeZone = string(v.timeZone, `${path}.timeZone`, 100, true);
@@ -111,6 +113,7 @@ function session(value: unknown, path: string, version: 1 | 2): Session {
     pausedMs, restUntil: v.restUntil === null ? null : number(v.restUntil, `${path}.restUntil`, MAX_TIME, true),
     restDuration: number(v.restDuration, `${path}.restDuration`, 86400, true), exercises, note: string(v.note, `${path}.note`, 10000),
     ...(v.recordedManually === undefined ? {} : { recordedManually: boolean(v.recordedManually, `${path}.recordedManually`) }),
+    ...(scheduleId === undefined ? {} : { scheduleId }),
     ...(v.templateId === undefined ? {} : { templateId: id(v.templateId, `${path}.templateId`) }), ...(finishedAt === undefined ? {} : { finishedAt }), ...(pausedAt === undefined ? {} : { pausedAt }),
   };
 }
@@ -164,13 +167,13 @@ export function validateTrainingSchedule(value: unknown): TrainingDate[] {
 /** Strict version-aware parsing, followed by an explicit pure v1 migration; never clears data. */
 export function validateAppData(value: unknown): AppData {
   const header = object(value, 'data', ['schemaVersion', 'revision', 'exercises', 'templates', 'sessions', 'settings', 'onboarded'], ['bodyMetrics', 'trainingSchedule']);
-  if (header.schemaVersion !== 1 && header.schemaVersion !== 2 && header.schemaVersion !== 3) fail('data.schemaVersion', '不支持的数据版本，请使用兼容版本打开；原数据已保留');
+  if (header.schemaVersion !== 1 && header.schemaVersion !== 2 && header.schemaVersion !== 3 && header.schemaVersion !== 4) fail('data.schemaVersion', '不支持的数据版本，请使用兼容版本打开；原数据已保留');
   const version = header.schemaVersion;
   const recordVersion = version === 1 ? 1 : 2;
-  const v = object(value, 'data', ['schemaVersion', 'revision', 'exercises', 'templates', 'sessions', 'settings', 'onboarded', ...(version >= 2 ? ['bodyMetrics'] : []), ...(version === 3 ? ['trainingSchedule'] : [])]);
+  const v = object(value, 'data', ['schemaVersion', 'revision', 'exercises', 'templates', 'sessions', 'settings', 'onboarded', ...(version >= 2 ? ['bodyMetrics'] : []), ...(version >= 3 ? ['trainingSchedule'] : [])]);
   const exercises = array(v.exercises, 'data.exercises', 5000, exercise);
   const templates = array(v.templates, 'data.templates', 1000, template);
-  const sessions = array(v.sessions, 'data.sessions', 10000, (entry, key) => session(entry, key, recordVersion));
+  const sessions = array(v.sessions, 'data.sessions', 10000, (entry, key) => session(entry, key, recordVersion, version === 4));
   unique(exercises, 'data.exercises'); unique(templates, 'data.templates'); unique(sessions, 'data.sessions');
   const exerciseIds = new Set(exercises.map((item) => item.id));
   for (const item of templates) for (const entry of item.items) if (!exerciseIds.has(entry.exerciseId)) fail('data.templates', '模板引用了不存在的动作');
@@ -180,22 +183,23 @@ export function validateAppData(value: unknown): AppData {
   if (version === 1) {
     const { showRpe: _showRpe, ...oldSettings } = common.settings;
     const old: LegacyAppData = { ...common, schemaVersion: 1, settings: oldSettings };
-    return migrateAppDataV1(old);
+    const migrated = migrateAppDataV1(old);
+    return { ...migrated, settings: settings(migrated.settings, 'data.settings', 2) };
   }
   const bodyMetrics = array(v.bodyMetrics, 'data.bodyMetrics', 50000, bodyMetric);
   unique(bodyMetrics, 'data.bodyMetrics');
   if (new Set(bodyMetrics.map(item => item.date)).size !== bodyMetrics.length) fail('data.bodyMetrics', '有重复日期');
-  const data: AppData = { ...common, schemaVersion: 2, bodyMetrics };
-  return version === 3 ? withTrainingSchedule(data, validateTrainingSchedule(v.trainingSchedule)) : data;
+  const data: AppData = { ...common, schemaVersion: version, bodyMetrics };
+  return version >= 3 ? withTrainingSchedule(data, validateTrainingSchedule(v.trainingSchedule)) : data;
 }
 
 /** Web/native cloud documents share only these collections. Keychain references,
  * device settings, drafts and sync secrets
  * remain outside the backup schema; reuse every existing record/snapshot validator. */
-export function validateSharedCollections(value: unknown): Pick<AppData, 'exercises' | 'templates' | 'sessions' | 'bodyMetrics'> {
+export function validateSharedCollections(value: unknown, scheduleLinks = false): Pick<AppData, 'exercises' | 'templates' | 'sessions' | 'bodyMetrics'> {
   const collections = object(value, '云同步', ['exercises', 'templates', 'sessions', 'bodyMetrics']);
   const parsed = validateAppData({
-    ...collections, schemaVersion: 2, revision: 0, onboarded: true,
+    ...collections, ...(scheduleLinks ? { schemaVersion: 4, trainingSchedule: [] } : { schemaVersion: 2 }), revision: 0, onboarded: true,
     settings: { unit: 'kg', theme: 'dark', defaultRest: 90, autoRest: true, showRpe: false, lastExportAt: null },
   });
   if (parsed.sessions.some(isDraft)) throw new Error('云同步文档不能包含进行中的训练');
@@ -222,7 +226,7 @@ export function parseBackup(text: string): AppData {
   try { parsed = JSON.parse(text); } catch { throw new Error('备份不是有效的 JSON 文件'); }
   const v = object(parsed, '文件', ['app', 'formatVersion', 'exportedAt', 'data']);
   if (v.app !== 'jianlibao') fail('app', '这不是健力宝备份');
-  if (v.formatVersion !== 1 && v.formatVersion !== 2 && v.formatVersion !== 3) fail('formatVersion', '不支持的备份版本，请使用兼容版本导入');
+  if (v.formatVersion !== 1 && v.formatVersion !== 2 && v.formatVersion !== 3 && v.formatVersion !== 4) fail('formatVersion', '不支持的备份版本，请使用兼容版本导入');
   if (!v.data || typeof v.data !== 'object' || !('schemaVersion' in v.data) || v.data.schemaVersion !== v.formatVersion) fail('formatVersion', '备份版本与数据版本不一致');
   iso(v.exportedAt, 'exportedAt');
   const validated = validateAppData(v.data);
@@ -291,6 +295,7 @@ export function mergeImport(current: AppData, incoming: AppData, resolution: 'ke
   }
   if (sessions.filter(isDraft).length > 1) throw new Error('导入会产生两场未完成训练。请先结束或取消本机训练，再导入这份备份。');
   // Preferences and onboarding belong to this browser; importing history never changes the theme or export reminder.
-  const merged = { ...local, exercises: merge(local.exercises, imported.exercises), templates: merge(local.templates, imported.templates), sessions, bodyMetrics };
+  const combined = { ...local, exercises: merge(local.exercises, imported.exercises), templates: merge(local.templates, imported.templates), sessions, bodyMetrics };
+  const merged = imported.schemaVersion === 4 ? withScheduleLinks(combined) : combined;
   return validateAppData(imported.trainingSchedule ? withTrainingSchedule(merged, merge(local.trainingSchedule ?? [], imported.trainingSchedule)) : merged);
 }

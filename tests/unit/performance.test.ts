@@ -5,8 +5,11 @@ import {
   adjustCount,
   adjustWeight,
   copyPrevious,
+  copyHistorySet,
+  exerciseSetHistory,
   lastWorkSet,
   nextSuggestedSet,
+  previousSetsByGroup,
   seedExercise,
 } from '../../src/features/workout/performance';
 
@@ -145,6 +148,34 @@ describe('seedExercise', () => {
     const initial = item([record({ status: 'pending', weightKg: 22.5, reps: 12, durationSeconds: 45 })]);
     expect(seedExercise(initial, [], cutoff)).toEqual(initial);
     expect(seedExercise(initial, [session({ status: 'cancelled' })], cutoff)).toEqual(initial);
+  });
+});
+
+describe('逐组历史', () => {
+  it('按同组类型及原组序匹配，跳过组和缺失组保留空位', () => {
+    const recent = session({ exercises: [item([
+      record({ id: 'warmup', type: 'warmup', weightKg: 30 }),
+      record({ id: 'first', weightKg: 60 }),
+      record({ id: 'skipped', status: 'skipped' }),
+      record({ id: 'third', weightKg: 80 }),
+      record({ id: 'drop', type: 'drop', weightKg: 35 }),
+    ])] });
+    const older = session({ id: 'older', date: '2026-10-15', exercises: [item([record({ id: 'older-first' }), record({ id: 'older-second' })])] });
+    const pending = item((['work', 'warmup', 'work', 'work', 'work', 'drop', 'failure'] as const).map((type, index) => record({ id: `next-${index}`, type, status: 'pending' })));
+    const history = exerciseSetHistory([older, recent], squat, cutoff);
+    expect(previousSetsByGroup(history, pending).map((set) => set?.id)).toEqual(['first', 'warmup', undefined, 'third', undefined, 'drop', undefined]);
+    expect(exerciseSetHistory([older, recent], { ...squat, kind: 'reps' }, cutoff)).toEqual([]);
+  });
+
+  it('只把匹配的历史数值填入指定待记组，保留已完成组和 RPE', () => {
+    const pending = item([record({ id: 'done' }), record({ id: 'next', status: 'pending', rpe: 8 })]);
+    const history = record({ id: 'source', weightKg: 72.5, reps: 6, rpe: 9 });
+    const updated = copyHistorySet(pending, 'next', history);
+    expect(updated.sets).toEqual([pending.sets[0], { ...pending.sets[1], weightKg: 72.5, reps: 6 }]);
+    expect(copyHistorySet(pending, 'done', history)).toEqual(pending);
+    expect(copyHistorySet(pending, 'next', { ...history, type: 'warmup' })).toEqual(pending);
+    expect(copyHistorySet(pending, 'next', { ...history, status: 'skipped' })).toEqual(pending);
+    expect(pending.sets[1].weightKg).toBe(60);
   });
 });
 

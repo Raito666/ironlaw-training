@@ -1,6 +1,6 @@
 # 铁律使用说明
 
-[打开固定网页版](https://jianlibao-training-raitox.netlify.app/mobile/) · [新版 Web/PWA 下载](https://github.com/Raito666/ironlaw-training/releases/tag/v0.4.0-web.20261112) · [11 月 10 日版安卓与 iOS 下载](https://github.com/Raito666/ironlaw-training/releases/tag/v0.4.0-20261110)。网页、手机浏览器和原生 App 各自保存本机数据，换设备前可先导出备份。
+[打开固定网页版](https://jianlibao-training-raitox.netlify.app/mobile/) · [下载各平台安装包](https://github.com/Raito666/ironlaw-training/releases/tag/v0.4.0-20261113)。网页、手机浏览器和原生 App 各自保存本机数据，换设备前可先导出备份。
 
 ## 1. 安装或打开
 
@@ -10,14 +10,14 @@
 - **Mac 上的 iOS 模拟器**。Apple 芯片 Mac 安装 Xcode 和 iOS 模拟器，解压 Simulator ZIP，将 `App.app` 拖到已启动的模拟器。命令行可用 `xcrun simctl install booted App.app`。
 - **iPhone 原生开发版**。Release 的 IPA 未签名，需要在自己的开发环境配置签名和设备授权。用 Xcode Personal Team 免费签名时需要定期重新部署。日常可直接用 PWA。 [Apple 官方说明](https://developer.apple.com/help/account/basics/about-your-developer-account/)
 
-## 2. 新版 Web/PWA 如何记一次训练
+## 2. 如何记一次训练
 
 1. 打开「今天」，直接开始当日排期或继续草稿。也可以在「计划」里选好当天模板，点「开始第 X 天」开练。
-2. 核对重量、次数或时长，点勾记录。自动休息时可直接点「+30 秒」或「跳过」。点底部动作计数可打开清单。
+2. 核对重量、次数或时长，点底部「完成第 N 组」。下一组会原地出现。自动休息时可直接点「+30 秒」或「跳过」。重开后从「继续训练」接回待记组。
 3. 从当前动作点「换动作」，选一个替代。已完成组与备注留在原动作，剩余组转给替代动作。
-4. 点「结束训练」。全部做完直接保存，提前结束时点「保存已完成 X 组」。保存后可以回看记录和补备注。
+4. 展开「逐组历史」可将上次某组填入当前组。点「结束训练」保存已完成组。历史里的「再练一次」按顺序带入各组实际数值。
 
-<img src="screenshots/training-flow.png" width="280" alt="手机记组和组间休息"> <img src="screenshots/training-saved.png" width="280" alt="训练保存结果">
+<img src="screenshots/training-offline.png" width="280" alt="320px 手机网页版断网重开后继续记第 2 组"> <img src="screenshots/training-saved.png" width="280" alt="训练保存结果">
 
 ### 安排整套训练
 
@@ -25,7 +25,8 @@
 
 1. 展开「安排整套模板」，选首周日期、时间和重复周数，最多 12 周。
 2. 在「训练排期」点「改期」或「取消这场排期」。替代动作随该场训练保留。
-3. 手机和电脑连接同一个加密同步空间。关闭网页后要收到提醒，请先把事件加到设备日历。改期后也请在设备日历更新已添加的事件。
+3. 在「今天」或「训练排期」点「补练」，完成后只有所选场次标为「已补练」。历史显示实际训练日期。
+4. 手机和电脑连接同一个加密同步空间。关闭网页后要收到提醒，请先把事件加到设备日历。改期后也请在设备日历更新已添加的事件。
 
 <img src="screenshots/schedule.png" width="320" alt="整套排期与改期">
 
@@ -48,7 +49,7 @@
 ## 5. 备份和同步
 
 - 在「我」里选「导出备份」，保存 JSON。换浏览器或手机时，先在新环境选择文件，检查预览再确认导入。CSV 便于查看，恢复完整记录请使用 JSON。
-- 新版备份可包含排期，仍能导入 v1 和 v2 备份。连接含排期的云同步空间时，各端使用此版本或更新版本。
+- 新版可导入 v1–v3 备份。首次训练关联具体场次后会导出 v4 备份。使用同一个同步空间时，请先更新旧的原生端。
 - 云同步需要主动连接同一个同步空间。同步密钥请私下保管，普通备份里没有密钥。原生版可以连接应用内置同步服务。自行部署的 Web 版需另外部署同步函数，本地静态 ZIP 可直接使用记录和备份。
 - 草稿及离线素材各自保存在设备里。卸载应用或清理浏览器存储前，请先导出备份。
 

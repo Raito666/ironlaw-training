@@ -7,6 +7,7 @@ import Icon from '../../components/Icon';
 import { prefersReducedMotion, subscribeReducedMotion } from '../../motion/reduced-motion';
 import TodayDial, { type DialSegment } from './TodayDial';
 import { presetExerciseById } from '../../content/training-presets';
+import type { ScheduledTraining } from '../plans/schedule';
 
 type Props = {
   data: AppData;
@@ -18,9 +19,12 @@ type Props = {
   monthlySets: number;
   writable: boolean;
   go: (page: Page) => void;
-  openStart: (template: WorkoutTemplate | 'free') => void;
-  quickStart: (template: WorkoutTemplate | 'free') => void;
-  scheduled?: { template: WorkoutTemplate; entry: { time: string } };
+  openStart: (template: WorkoutTemplate | 'free', scheduleId?: string) => void;
+  quickStart: (template: WorkoutTemplate | 'free', scheduleId?: string) => void;
+  todaySchedule: ScheduledTraining[];
+  missedSchedule: ScheduledTraining[];
+  nextScheduled?: ScheduledTraining;
+  onSchedule: () => void;
   setTemplateEditor: (template: WorkoutTemplate | 'new') => void;
   onExercise: (exercise: Exercise) => void;
 };
@@ -96,13 +100,18 @@ export default function TodayPage({
   go,
   openStart,
   quickStart,
-  scheduled,
+  todaySchedule,
+  missedSchedule,
+  nextScheduled,
+  onSchedule,
   setTemplateEditor,
   onExercise,
 }: Props) {
   const heroRef = useRef<HTMLElement>(null);
   const dialRef = useRef<HTMLDivElement>(null);
   const ctaRef = useRef<HTMLDivElement>(null);
+  const scheduled = todaySchedule[0];
+  const moreToday = active ? todaySchedule : todaySchedule.slice(1);
   const template = scheduled?.template ?? templates[0];
   const activeStats = active ? sessionStats(active) : null;
 
@@ -301,7 +310,7 @@ export default function TodayPage({
                   className="btn btn-primary today-cta"
                   data-haptic="selection"
                   disabled={!writable}
-                  onClick={() => (active ? go('workout') : quickStart(template ?? 'free'))}
+                  onClick={() => (active ? go('workout') : quickStart(template ?? 'free', scheduled?.entry.id))}
                 >
                   <span>{active ? '继续未完成训练' : template ? '开始今天的训练' : '开始自由训练'}</span>
                   <span className="today-cta-icon">
@@ -310,7 +319,7 @@ export default function TodayPage({
                 </button>
               </div>
               {!active && template && (
-                <button className="hero-link today-hero-link" onClick={() => openStart(template)}>预览训练</button>
+                <button className="hero-link today-hero-link" onClick={() => openStart(template, scheduled?.entry.id)}>预览训练</button>
               )}
               <button className="hero-link today-hero-link" onClick={() => go('plans')}>
                 查看 / 调整训练模板
@@ -333,6 +342,28 @@ export default function TodayPage({
             <span className="today-dial-note">SESSION MAP</span>
           </div>
         </section>
+
+        {(moreToday.length > 0 || missedSchedule.length > 0 || nextScheduled) && (
+          <section className="card today-schedule" aria-labelledby="today-schedule-title">
+            <div className="section-heading">
+              <h2 id="today-schedule-title">训练安排</h2>
+              <button type="button" className="btn btn-ghost" onClick={onSchedule}>查看排期</button>
+            </div>
+            <ul>
+              {moreToday.map(({ entry, template }) => <li key={entry.id}>
+                <div><strong className="wrap-cjk">{template.name}</strong><span>今天 · {entry.time}</span></div>
+                <button type="button" className="btn btn-secondary" disabled={!writable} onClick={() => quickStart(template, entry.id)}>开练</button>
+              </li>)}
+              {missedSchedule.map(({ entry, template }) => <li key={entry.id}>
+                <div><strong className="wrap-cjk">{template.name}</strong><span>待补练 · {entry.date} {entry.time}</span></div>
+                <button type="button" className="btn btn-secondary" disabled={!writable} onClick={() => quickStart(template, entry.id)}>补练</button>
+              </li>)}
+              {nextScheduled && <li>
+                <div><strong className="wrap-cjk">{nextScheduled.template.name}</strong><span>下个训练日 · {nextScheduled.entry.date} {nextScheduled.entry.time}</span></div>
+              </li>}
+            </ul>
+          </section>
+        )}
 
         <section className="stats today-stats" aria-label="本月训练概览">
           <div className="stat">

@@ -203,7 +203,7 @@ test.describe('手机横屏安全区', () => {
   test.use({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true });
   test('正文、导航和弹窗避开左右安全区', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('button', { name: '开始今天的训练', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: '开始自由训练', exact: true })).toBeEnabled();
     await page.evaluate(() => {
       document.documentElement.style.setProperty('--safe-left', '44px');
       document.documentElement.style.setProperty('--safe-right', '20px');

@@ -1,8 +1,9 @@
 import { expect, test } from 'vitest';
-import { calendarFile, isTrainingDue, upsertTrainingDate, scheduleSeries, rescheduleTrainingDate, type TrainingDate } from '../../src/features/plans/schedule';
+import { calendarFile, indexScheduledSessions, isTrainingDue, upsertTrainingDate, scheduleSeries, rescheduleTrainingDate, type TrainingDate } from '../../src/features/plans/schedule';
 import { createInitialData } from '../../src/domain/seed';
-import { migrateLocalSchedule, withTrainingSchedule } from '../../src/data/migrations';
-import { exportBackup, parseBackup } from '../../src/data/backup';
+import { completeSession, createSession, reviewSession, toggleSet } from '../../src/domain/training';
+import { migrateLocalSchedule, withScheduleLinks, withTrainingSchedule } from '../../src/data/migrations';
+import { exportBackup, mergeImport, parseBackup, validateAppData } from '../../src/data/backup';
 import { applySnapshot, emptySnapshot, mergeSnapshots, snapshotOf, validateSnapshot } from '../../src/sync/model';
 
 const entry: TrainingDate = { id: 'jlb-date-1', templateId: 'preset-photo-complete-chest', date: '2026-11-10', time: '18:30', lead: 15, choices: {} };
@@ -54,6 +55,50 @@ test('migration keeps durable records and imports legacy browser dates exactly o
   expect(migrated.trainingSchedule).toEqual([durable, another]);
   expect(migrateLocalSchedule(migrated, [entry, another])).toBe(migrated);
   expect(migrated.sessions).toBe(old.sessions);
+});
+
+test('late completion links a single occurrence and preserves the actual training date through backup and sync', () => {
+  const data = createInitialData();
+  const template = data.templates[0];
+  const time = Date.parse('2026-11-12T08:00:00Z');
+  const missed = { ...entry, templateId: template.id, date: '2026-11-11' };
+  const today = { ...missed, id: 'today', date: '2026-11-12' };
+  const old = withTrainingSchedule(data, [missed, today]);
+  const draft = { ...createSession(template, data.exercises, time), scheduleId: missed.id };
+  const recorded = toggleSet(draft, draft.exercises[0].id, draft.exercises[0].sets[0].id, time + 1000);
+  const session = completeSession(reviewSession(recorded, time + 2000), time + 2000);
+  const workspace = withScheduleLinks({ ...old, sessions: [session] });
+  const find = indexScheduledSessions(workspace.sessions);
+  expect(find(missed)?.id).toBe(session.id);
+  expect(find(today)).toBeUndefined();
+  expect(session.date).toBe(today.date);
+  expect(indexScheduledSessions([{ ...session, status: 'cancelled' }])(missed)).toBeUndefined();
+  expect(indexScheduledSessions([{ ...session, scheduleId: undefined }])(today)?.id).toBe(session.id);
+  expect(indexScheduledSessions([{ ...session, scheduleId: undefined }])(missed)).toBeUndefined();
+
+  const restored = parseBackup(exportBackup(workspace));
+  expect(restored).toEqual(workspace);
+  expect(mergeImport(old, restored, 'keep-local')).toEqual(workspace);
+  expect(parseBackup(exportBackup(old))).toEqual(old);
+  expect(validateAppData({ ...workspace, trainingSchedule: [today] }).sessions[0]).toEqual(session);
+  expect(() => validateAppData({ ...workspace, schemaVersion: 3 })).toThrow('scheduleId');
+  expect(() => validateAppData({ ...workspace, sessions: [{ ...session, scheduleId: 'invalid / id' }] })).toThrow('scheduleId');
+
+  const prior = snapshotOf(old);
+  const draftSnapshot = snapshotOf(withScheduleLinks({ ...old, sessions: [draft] }));
+  expect(draftSnapshot.version).toBe(2);
+  expect(draftSnapshot.sessions).toEqual([]);
+  const snapshot = snapshotOf(restored);
+  expect(snapshot.version).toBe(3);
+  const merged = mergeSnapshots(prior, prior, snapshot);
+  expect(merged.conflicts).toEqual([]);
+  const secondDevice = applySnapshot(old, merged.snapshot);
+  expect(secondDevice).toEqual({
+    ...workspace,
+    exercises: [...workspace.exercises].sort((a, b) => a.id.localeCompare(b.id)),
+    templates: [...workspace.templates].sort((a, b) => a.id.localeCompare(b.id)),
+  });
+  expect(() => validateSnapshot({ ...snapshot, version: 2 })).toThrow('scheduleId');
 });
 
 test('iCalendar has a stable UID, escaped text and a 15-minute alarm', () => {

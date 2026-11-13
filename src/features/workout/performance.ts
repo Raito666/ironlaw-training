@@ -1,6 +1,6 @@
-import type { Exercise, Session, SessionExercise, SetRecord } from '../../domain/types';
-import { fromWeight } from '../../domain/units';
-import { isWorkSet } from '../../domain/sets';
+import type { Exercise, Session, SessionExercise, SetRecord, SetType } from '../../domain/types';
+import { displayWeight, fromWeight } from '../../domain/units';
+import { isWorkSet, setTypeLabels } from '../../domain/sets';
 
 function validDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -23,12 +23,62 @@ function values(set: SetRecord): Pick<SetRecord, 'weightKg' | 'reps' | 'duration
   return { weightKg: set.weightKg, reps: set.reps, durationSeconds: set.durationSeconds };
 }
 
-export function lastWorkSet(history: Session[], exercise: Exercise, beforeDate = today(), excludeId?: string): SetRecord | undefined {
-  if (!validDate(beforeDate)) return undefined;
-  const sessions = history
+function completedBefore(history: Session[], beforeDate: string, excludeId?: string) {
+  if (!validDate(beforeDate)) return [];
+  return history
     .filter((session) => session.status === 'completed' && session.id !== excludeId
       && validDate(session.date) && session.date <= beforeDate && Number.isFinite(Date.parse(session.startedAt)))
     .sort((a, b) => b.date.localeCompare(a.date) || Date.parse(b.startedAt) - Date.parse(a.startedAt));
+}
+
+export type ExerciseSetHistory = Pick<Session, 'id' | 'name' | 'date' | 'exercises'>;
+
+export function exerciseSetHistory(history: Session[], exercise: Exercise, beforeDate = today(), excludeId?: string): ExerciseSetHistory[] {
+  return completedBefore(history, beforeDate, excludeId).flatMap(({ id, name, date, exercises }) => {
+    const matches = exercises.filter((item) => item.exercise.id === exercise.id && item.exercise.kind === exercise.kind
+      && item.sets.some((set) => set.status === 'completed'));
+    return matches.length ? [{ id, name, date, exercises: matches }] : [];
+  });
+}
+
+export function previousSetsByGroup(history: ExerciseSetHistory[], item: SessionExercise) {
+  const typeSets = new Map<SetType, SetRecord[]>();
+  const types = Object.keys(setTypeLabels) as SetType[];
+  for (const entry of history) {
+    const sets = entry.exercises.flatMap((exercise) => exercise.sets);
+    for (const type of types) {
+      if (typeSets.has(type)) continue;
+      const matching = sets.filter((set) => set.type === type);
+      if (matching.some((set) => set.status === 'completed' && validValues(set, item.exercise.kind))) typeSets.set(type, matching);
+    }
+    if (typeSets.size === types.length) break;
+  }
+  const counts = { warmup: 0, work: 0, drop: 0, failure: 0 };
+  return item.sets.map(({ type }) => {
+    const rank = counts[type]++;
+    const candidate = typeSets.get(type)?.[rank];
+    if (candidate?.status === 'completed' && validValues(candidate, item.exercise.kind)) return candidate;
+    return undefined;
+  });
+}
+
+export function canCopyHistorySet(kind: Exercise['kind'], target: SetRecord, source: SetRecord) {
+  return target.status === 'pending' && source.type === target.type && source.status === 'completed' && validValues(source, kind);
+}
+
+export function copyHistorySet(item: SessionExercise, targetId: string, source: SetRecord): SessionExercise {
+  return { ...item, sets: item.sets.map((set) => set.id === targetId && canCopyHistorySet(item.exercise.kind, set, source)
+    ? { ...set, ...values(source) } : set) };
+}
+
+export function formatSetValue(set: SetRecord, kind: Exercise['kind'], unit: 'kg' | 'lb') {
+  if (kind === 'duration') return `${set.durationSeconds} 秒`;
+  if (kind === 'weight-reps') return `${displayWeight(set.weightKg, unit)} ${unit} × ${set.reps}`;
+  return `${set.reps} 次`;
+}
+
+export function lastWorkSet(history: Session[], exercise: Exercise, beforeDate = today(), excludeId?: string): SetRecord | undefined {
+  const sessions = completedBefore(history, beforeDate, excludeId);
   let fallback: SetRecord | undefined;
   for (const session of sessions) {
     for (let exerciseIndex = session.exercises.length - 1; exerciseIndex >= 0; exerciseIndex--) {

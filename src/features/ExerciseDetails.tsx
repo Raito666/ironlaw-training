@@ -20,6 +20,9 @@ import { textLicense } from "../content/text-license";
 import { BodyFigure } from "../components/BodyAtlas";
 import { exerciseMuscles } from "../content/body-map";
 import ReferenceMedia from "../components/ReferenceMedia";
+import OpenGymMedia from "../components/OpenGymMedia";
+import SetHistory from './workout/SetHistory';
+import { exerciseSetHistory } from './workout/performance';
 import {
   isOpenGymExercise,
   loadOpenGymCatalogue,
@@ -81,6 +84,7 @@ export default function ExerciseDetails({
   const performance = data
     ? exercisePerformance(data.sessions, exercise.id, exercise.kind)
     : [];
+  const setHistory = tab === 'history' && data ? exerciseSetHistory(data.sessions, exercise) : [];
   const muscles = exerciseMuscles(exercise);
   const format = (n: number) =>
     exercise.kind === "weight-reps"
@@ -435,6 +439,7 @@ export default function ExerciseDetails({
             </>
           ) : extended ? (
             <div className="opengym-explanation wrap-cjk">
+              <OpenGymMedia exerciseId={exercise.id} name={exercise.name} />
               <h2>
                 {tab === "brief"
                   ? "动作要点"
@@ -480,7 +485,7 @@ export default function ExerciseDetails({
                         </ol>
                       ) : (
                         <p lang="zh-CN">
-                           源资料暂无分步文字，请参阅下方的动作描述与记录方式。
+                          源资料暂无分步文字，请结合示范与动作描述阅读。
                         </p>
                       )}
                     </section>
@@ -546,6 +551,7 @@ export default function ExerciseDetails({
           )
         ) : (
           <>
+            {setHistory.length > 0 && <SetHistory history={setHistory} kind={exercise.kind} unit={data?.settings.unit ?? 'kg'} />}
             {performance.length ? (
               <>
                 <TrendChart

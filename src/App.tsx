@@ -1,13 +1,14 @@
-import { isWarmupTemplateItem, isWorkSet } from './domain/sets';
+import { isWarmupTemplateItem } from './domain/sets';
 import { ensurePresetExercises, presetExerciseById, resolvePresetDay } from './content/training-presets';
-import { TrainingReminder, trainingStarted } from './features/plans/TrainingSchedule';
+import { TrainingReminder } from './features/plans/TrainingSchedule';
+import { indexScheduledSessions, type TrainingDate } from './features/plans/schedule';
 import { useTrainingSchedule } from './features/plans/useTrainingSchedule';
+import { withScheduleLinks } from './data/migrations';
 import Presence from './motion/Presence';
 import AppShell from './app/AppShell';
 import BrandMark from './components/BrandMark';
 import { flushSync } from 'react-dom';
 import { withViewTransition } from './motion/transition';
-import { seedExercise } from './features/workout/performance';
 import { useRestReminder } from './features/workout/useRestReminder';
 import Toast from './components/Toast';
 import { getPage, type Page } from './app/navigation';
@@ -17,7 +18,7 @@ import PlansPage from './features/plans/PlansPage';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { AppData, Exercise, Session, WorkoutTemplate } from './domain/types';
 import { isRetiredStarterTemplate } from './domain/seed';
-import { completeSession, createSession, reviewSession, sessionStats, uid } from './domain/training';
+import { completeSession, createRepeatedSession, createSession, reviewSession, sessionStats, uid } from './domain/training';
 import { useWorkspace } from './hooks/useWorkspace';
 import { useCloudSync } from './sync/useCloudSync';
 import Icon from './components/Icon';
@@ -35,6 +36,8 @@ import { addToTraining, insertWarmups } from './features/workout/catalogue-actio
 import { usePendingMutation } from './features/pending-mutation';
 
 const isDraft = (s: Session) => ['active', 'paused', 'review'].includes(s.status);
+const templateForSchedule = (entry: TrainingDate, templates: WorkoutTemplate[]) =>
+  resolvePresetDay(entry.templateId, templates.find((template) => template.id === entry.templateId), entry.choices);
 
 export default function App() {
   useNativeInterface();
@@ -66,7 +69,8 @@ export default function App() {
   const [templateEditor, setTemplateEditor] = useState<WorkoutTemplate | 'new' | null>(null);
   const [exerciseEditor, setExerciseEditor] = useState(false);
   const [exerciseInfo, setExerciseInfo] = useState<Exercise | null>(null);
-  const [startTemplate, setStartTemplate] = useState<WorkoutTemplate | 'free' | null>(null);
+  const [startRequest, setStartRequest] = useState<{ template: WorkoutTemplate | 'free'; scheduleId?: string; repeat?: Session } | null>(null);
+  const startTemplate = startRequest?.template;
   const starting = useRef(false);
   const [finishing, setFinishing] = useState<Session | null>(null);
   const [savedSessionId, setSavedSessionId] = useState('');
@@ -84,6 +88,13 @@ export default function App() {
   const go = (next: Page) => {
     location.hash = `/${next}`;
     navigate(next);
+  };
+  const goSchedule = () => {
+    if (page === 'plans') document.getElementById('training-schedule')?.scrollIntoView({ block: 'start' });
+    else {
+      location.hash = '/plans?schedule=1';
+      navigate('plans');
+    }
   };
   function navigate(next: Page) {
     if (intendedPage.current === next) {
@@ -159,11 +170,16 @@ export default function App() {
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   const templates = data.templates.filter((t) => !t.archived && !isRetiredStarterTemplate(t));
   const date = new Date();
-  const scheduled = schedule.entries.flatMap((entry) => {
-    if (entry.date !== localDate(date) || trainingStarted(entry, data.sessions)) return [];
-    const template = resolvePresetDay(entry.templateId, data.templates.find((t) => t.id === entry.templateId), entry.choices);
+  const today = localDate(date);
+  const findScheduledSession = indexScheduledSessions(data.sessions);
+  const waiting = schedule.entries.flatMap((entry) => {
+    if (findScheduledSession(entry)) return [];
+    const template = templateForSchedule(entry, data.templates);
     return template && !template.archived ? [{ entry, template }] : [];
-  })[0];
+  });
+  const todaySchedule = waiting.filter(({ entry }) => entry.date === today);
+  const missedSchedule = waiting.filter(({ entry }) => entry.date < today).slice(-3).reverse();
+  const nextScheduled = waiting.find(({ entry }) => entry.date > today);
   const monthSessions = completed.filter((s) => s.date.startsWith(localDate(date).slice(0, 7)));
   const monthlySeconds = monthSessions.reduce((n, s) => n + sessionStats(s).activeSeconds, 0);
   const monthlySets = monthSessions.reduce((n, s) => n + sessionStats(s).completedSets, 0);
@@ -188,39 +204,45 @@ export default function App() {
         sessions: d.sessions.map((s) => (s.id === latest.id ? fn(s, d) : s)),
       };
     });
-  const begin = async (target: WorkoutTemplate | 'free') => {
+  const begin = async (target: WorkoutTemplate | 'free', scheduleId?: string, repeat?: Session) => {
     if (!writable || starting.current) return;
     if (active) {
-      setStartTemplate(null);
+      setStartRequest(null);
       go('workout');
       return;
     }
     starting.current = true;
-    const template = target === 'free' ? null : target;
+    let scheduleChanged = false;
     try {
       const ok = await mutate((d) => {
         if (d.sessions.some(isDraft)) throw new Error('请先继续已有草稿');
-        const next = template ? ensurePresetExercises(d, [template]) : d;
-        const session = createSession(template, next.exercises);
-        if (!template?.items.some(isWarmupTemplateItem)) {
-          session.exercises = session.exercises.map((item) =>
-            seedExercise(item, d.sessions, session.date, session.id),
-          );
+        let template = target === 'free' ? null : target;
+        if (scheduleId) {
+          const entry = d.trainingSchedule?.find(({ id }) => id === scheduleId);
+          const latest = entry ? templateForSchedule(entry, d.templates) : undefined;
+          if (!entry || !latest || latest.archived || indexScheduledSessions(d.sessions)(entry)) {
+            scheduleChanged = true;
+            throw new Error('这场排期已变更，请返回排期查看');
+          }
+          template = latest;
         }
+        const next = template && !repeat ? ensurePresetExercises(d, [template]) : d;
+        const session = repeat ? createRepeatedSession(repeat) : createSession(template, next.exercises);
+        if (scheduleId) session.scheduleId = scheduleId;
         if (!template) session.restDuration = d.settings.defaultRest;
-        return { ...next, onboarded: true, sessions: [...next.sessions, session] };
+        return { ...(scheduleId ? withScheduleLinks(next) : next), onboarded: true, sessions: [...next.sessions, session] };
       });
-      setStartTemplate(null);
+      setStartRequest(null);
       if (ok) go('workout');
-      else notify('训练草稿尚未写入，请重试本机保存。');
+      else notify(scheduleChanged ? '这场排期已变更，请返回排期查看。' : '训练草稿尚未写入，请重试本机保存。');
     } finally {
       starting.current = false;
     }
   };
-  const quickStart = (target: WorkoutTemplate | 'free') => {
+  const quickStart = (target: WorkoutTemplate | 'free', scheduleId?: string) => {
     if (starting.current) return;
-    if (active) setStartTemplate(target);
-    else void begin(target);
+    if (active && (!scheduleId || active.scheduleId !== scheduleId)) setStartRequest({ template: target, scheduleId });
+    else void begin(target, scheduleId);
   };
   const exportCurrent = async () => {
     try {
@@ -243,9 +265,9 @@ export default function App() {
     }
   };
 
-  const openStart = (t: WorkoutTemplate | 'free') => {
+  const openStart = (t: WorkoutTemplate | 'free', scheduleId?: string) => {
     setToast('');
-    setStartTemplate(t);
+    setStartRequest({ template: t, scheduleId });
   };
   async function useExercise(exercise: Exercise): Promise<boolean> {
     if (active) {
@@ -279,7 +301,7 @@ export default function App() {
   }
   async function repeatSession(session: Session) {
     if (active) {
-      setStartTemplate('free');
+      openStart('free');
       return;
     }
     const items = session.exercises.filter((ex) => ex.sets.some((s) => s.status === 'completed'));
@@ -291,24 +313,19 @@ export default function App() {
       }));
       if (!ok) return;
     }
-    openStart({
-      id: uid(),
-      name: `${session.name.slice(0, 100)} · 复练`,
-      description: `来自 ${session.date}，上次结果作为待确认目标，不会自动算成已完成。`,
-      restSeconds: session.restDuration,
-      updatedAt: new Date().toISOString(),
-      items: items.map((ex) => {
-        const sets = ex.sets.filter((s) => s.status === 'completed' && isWorkSet(s));
-        const last = sets.at(-1) ?? ex.sets.find((s) => s.status === 'completed')!;
-        return {
-          id: uid(),
-          exerciseId: ex.exercise.id,
-          sets: Math.min(30, Math.max(1, sets.length)),
-          weightKg: last.weightKg,
-          reps: last.reps || 10,
-          durationSeconds: last.durationSeconds || 30,
-        };
-      }),
+    setToast('');
+    setStartRequest({
+      repeat: session,
+      template: {
+        id: uid(), name: `${session.name.slice(0, 100)} · 复练`,
+        description: `来自 ${session.date}。逐组带入已完成的训练值和组类型，开始后可调整。`,
+        restSeconds: session.restDuration, updatedAt: new Date().toISOString(),
+        items: items.map((ex) => {
+          const recorded = ex.sets.filter((set) => set.status === 'completed');
+          const { weightKg, reps, durationSeconds } = recorded[0];
+          return { id: uid(), exerciseId: ex.exercise.id, sets: recorded.length, weightKg, reps, durationSeconds };
+        }),
+      },
     });
   }
 
@@ -332,13 +349,13 @@ export default function App() {
                 title={
                   active ? '继续已有训练' : startTemplate === 'free' ? '开始自由训练' : startTemplate.name
                 }
-                onClose={() => setStartTemplate(null)}
+                onClose={() => setStartRequest(null)}
                 footer={
                   <>
-                    <button className="btn btn-secondary" onClick={() => setStartTemplate(null)}>
+                    <button className="btn btn-secondary" onClick={() => setStartRequest(null)}>
                       暂不开始
                     </button>
-                    <button className="btn btn-primary" disabled={!writable} onClick={() => void begin(startTemplate)}>
+                    <button className="btn btn-primary" disabled={!writable} onClick={() => void begin(startTemplate, startRequest?.scheduleId, startRequest?.repeat)}>
                       {active ? '继续已有训练' : '确认开始训练'}
                       <Icon name="arrow" />
                     </button>
@@ -488,11 +505,7 @@ export default function App() {
         </>
       }
     >
-      {page !== 'workout' && schedule.entries.length > 0 && <TrainingReminder entries={schedule.entries} sessions={data.sessions}
-        onOpen={() => {
-          if (page === 'plans') document.getElementById('training-schedule')?.scrollIntoView({ block: 'start' });
-          else go('plans');
-        }} />}
+      {page !== 'workout' && schedule.entries.length > 0 && <TrainingReminder entries={schedule.entries} findSession={findScheduledSession} onOpen={goSchedule} />}
       {page === 'today' && (
         <TodayPage
           data={data}
@@ -506,7 +519,10 @@ export default function App() {
           go={go}
           openStart={openStart}
           quickStart={quickStart}
-          scheduled={scheduled}
+          todaySchedule={todaySchedule}
+          missedSchedule={missedSchedule}
+          nextScheduled={nextScheduled}
+          onSchedule={goSchedule}
           setTemplateEditor={setTemplateEditor}
           onExercise={setExerciseInfo}
         />
@@ -525,6 +541,11 @@ export default function App() {
           setArchiveTemplate={setArchiveTemplate}
           setShowArchived={setShowArchived}
           schedule={schedule}
+          findScheduledSession={findScheduledSession}
+          onScheduledHistory={(session) => {
+            location.hash = `/progress?session=${encodeURIComponent(session.id)}`;
+            navigate('progress');
+          }}
         />
       )}
       {page === 'exercises' && (
@@ -548,6 +569,8 @@ export default function App() {
           onExercise={setExerciseInfo}
           savedSessionId={savedSessionId}
           onDismissSaved={() => setSavedSessionId('')}
+          nextScheduled={todaySchedule[0] ?? nextScheduled}
+          onSchedule={goSchedule}
         />
       )}
       {page === 'settings' && (
@@ -571,6 +594,7 @@ export default function App() {
             data={data}
             session={workout}
             writable={writable}
+            online={online}
             update={updateSession}
             addExercise={async (exercise, replaceId) => {
               let insertedId: string | undefined;

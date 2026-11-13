@@ -13,6 +13,7 @@ import HistoryCalendar from './history/HistoryCalendar';
 import SessionList from './history/SessionList';
 import HistoryToolbar from './history/HistoryToolbar';
 import { exportTextFile } from '../platform/native';
+import type { ScheduledTraining } from './plans/schedule';
 
 export function downloadCsv(sessions: Session[]) {
   return exportTextFile({
@@ -31,6 +32,8 @@ export default function TrainingJournal({
   onExercise,
   savedSessionId,
   onDismissSaved,
+  nextScheduled,
+  onSchedule,
 }: {
   data: AppData;
   writable: boolean;
@@ -41,6 +44,8 @@ export default function TrainingJournal({
   onExercise: (ex: Exercise) => void;
   savedSessionId?: string;
   onDismissSaved: () => void;
+  nextScheduled?: ScheduledTraining;
+  onSchedule: () => void;
 }) {
   const [manual, setManual] = useState(false);
   const today = dayKey(new Date());
@@ -50,7 +55,10 @@ export default function TrainingJournal({
   const [search, setSearch] = useState('');
   const [allHistory, setAllHistory] = useState(false);
   const [historyExercise, setHistoryExercise] = useState('all');
-  const [selected, setSelected] = useState<Session | null>(null);
+  const [selected, setSelected] = useState<Session | null>(() => {
+    const id = new URLSearchParams(location.hash.split('?')[1]).get('session');
+    return id ? data.sessions.find((session) => session.id === id && session.status === 'completed') ?? null : null;
+  });
   const [calendarOpen, setCalendarOpen] = useState(() => !isCompactViewport());
   useEffect(() => {
     const media = window.matchMedia(COMPACT_LAYOUT_QUERY);
@@ -110,6 +118,11 @@ export default function TrainingJournal({
             <button type="button" className="btn btn-ghost" onClick={onDismissSaved}>收起</button>
           </div>
           <button type="button" className="btn btn-secondary" onClick={() => setSelected(savedSession)}>查看本次训练</button>
+          {nextScheduled && <div className="saved-next-training">
+            <div className="wrap-cjk"><strong>下一场 · {nextScheduled.template.name}</strong>
+              <p className="muted">{nextScheduled.entry.date === today ? '今天' : nextScheduled.entry.date} · {nextScheduled.entry.time}</p></div>
+            <button type="button" className="btn btn-ghost" onClick={onSchedule}>查看排期</button>
+          </div>}
           <details>
             <summary>补写训练备注</summary>
             <form onSubmit={async (event) => {

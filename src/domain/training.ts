@@ -38,6 +38,20 @@ export function createSession(template: WorkoutTemplate | null, exercises: Exerc
   };
 }
 
+export function createRepeatedSession(source: Session, now = Date.now()): Session {
+  if (source.status !== 'completed') throw new Error('只能从已完成的训练开始复练');
+  const exercises = source.exercises.flatMap((item) => {
+    const recorded = item.sets.filter((set) => set.status === 'completed');
+    if (!recorded.length) return [];
+    const repeated = createSessionExercise(item.exercise, recorded.length);
+    repeated.sets = recorded.map(({ type, weightKg, reps, durationSeconds }, index) => ({
+      ...repeated.sets[index], type, weightKg, reps, durationSeconds,
+    }));
+    return [repeated];
+  });
+  return { ...createSession(null, [], now), name: `${source.name.slice(0, 100)} · 复练`, restDuration: source.restDuration, exercises };
+}
+
 export function toggleSet(session: Session, exerciseId: string, setId: string, now = Date.now()): Session {
   if (session.status !== 'active') throw new Error('请先恢复训练，再记录本组');
   const exercise = session.exercises.find((item) => item.id === exerciseId);
